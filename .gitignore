@@ -1,0 +1,7 @@
+backend/target/
+target/
+storage/
+docker/.env
+*.log
+.idea/
+.vscode/
