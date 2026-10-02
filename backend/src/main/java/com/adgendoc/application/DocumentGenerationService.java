@@ -120,6 +120,12 @@ public class DocumentGenerationService {
         return new DocumentContent(document, bytes);
     }
 
+    /** Documents générés pour une demande (E2, statut {@code GENERATED}). */
+    public List<GeneratedDocument> listDocuments(UUID requestId) {
+        Objects.requireNonNull(requestId, "requestId");
+        return generatedDocumentRepository.findByRequestId(requestId);
+    }
+
     private Map<String, String> buildTemplateVariables(DocumentRequest request) {
         Map<String, Object> data = request.getData();
         Map<String, String> variables = new LinkedHashMap<>();
