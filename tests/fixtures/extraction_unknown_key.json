@@ -1,0 +1,14 @@
+{
+  "documentType": "ATTESTATION_CONCORDANCE",
+  "confidence": 0.94,
+  "data": {
+    "prenom": "Maria",
+    "nom": "Gomes",
+    "dateNaissance": "1985-05-12",
+    "lieuNaissance": "Bissau",
+    "nomIncorrect": "Maria Gomez",
+    "nomCorrect": "Maria Gomes",
+    "passeport": "X123"
+  },
+  "missingFields": []
+}

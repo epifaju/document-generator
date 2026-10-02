@@ -1,0 +1,13 @@
+{
+  "documentType": "ACTE_NAISSANCE",
+  "confidence": 0.9,
+  "data": {
+    "prenom": "Maria",
+    "nom": "Gomes",
+    "dateNaissance": "1985-05-12",
+    "lieuNaissance": "Bissau",
+    "nomIncorrect": "Maria Gomez",
+    "nomCorrect": "Maria Gomes"
+  },
+  "missingFields": []
+}
