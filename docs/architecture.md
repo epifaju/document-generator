@@ -645,18 +645,24 @@ Contenu exact à écrire :
     }
   },
   "allOf": [
-    { "if": { "not": { "required": ["prenom"] } },
-      "then": { "missingFields": { "contains": { "const": "prenom" } } } },
-    { "if": { "not": { "required": ["nom"] } },
-      "then": { "missingFields": { "contains": { "const": "nom" } } } },
-    { "if": { "not": { "required": ["dateNaissance"] } },
-      "then": { "missingFields": { "contains": { "const": "dateNaissance" } } } },
-    { "if": { "not": { "required": ["lieuNaissance"] } },
-      "then": { "missingFields": { "contains": { "const": "lieuNaissance" } } } },
-    { "if": { "not": { "required": ["nomIncorrect"] } },
-      "then": { "missingFields": { "contains": { "const": "nomIncorrect" } } } },
-    { "if": { "not": { "required": ["nomCorrect"] } },
-      "then": { "missingFields": { "contains": { "const": "nomCorrect" } } } }
+    { "if": { "required": ["data"],
+              "properties": { "data": { "not": { "required": ["prenom"] } } } },
+      "then": { "properties": { "missingFields": { "contains": { "const": "prenom" } } } } },
+    { "if": { "required": ["data"],
+              "properties": { "data": { "not": { "required": ["nom"] } } } },
+      "then": { "properties": { "missingFields": { "contains": { "const": "nom" } } } } },
+    { "if": { "required": ["data"],
+              "properties": { "data": { "not": { "required": ["dateNaissance"] } } } },
+      "then": { "properties": { "missingFields": { "contains": { "const": "dateNaissance" } } } } },
+    { "if": { "required": ["data"],
+              "properties": { "data": { "not": { "required": ["lieuNaissance"] } } } },
+      "then": { "properties": { "missingFields": { "contains": { "const": "lieuNaissance" } } } } },
+    { "if": { "required": ["data"],
+              "properties": { "data": { "not": { "required": ["nomIncorrect"] } } } },
+      "then": { "properties": { "missingFields": { "contains": { "const": "nomIncorrect" } } } } },
+    { "if": { "required": ["data"],
+              "properties": { "data": { "not": { "required": ["nomCorrect"] } } } },
+      "then": { "properties": { "missingFields": { "contains": { "const": "nomCorrect" } } } } }
   ]
 }
 ```
