@@ -21,7 +21,7 @@ contrat uniquement, aucun code d'implémentation).
 
 | En-tête | Direction | Règle |
 |---|---|---|
-| `Content-Type: application/json; charset=UTF-8` | requête (tous les POST) | obligatoire pour les corps JSON |
+| `Content-Type: application/json; charset=UTF-8` | requête (tous les POST) | obligatoire pour les corps JSON ; **toute autre valeur** → `400` `VALIDATION_ERROR` (corps `ErrorResponse`, requête non traitée, **non persistée** — comportement F-06) |
 | `Accept: application/json` | requête | recommandé (sauf téléchargement binaire) |
 | `X-Correlation-Id` | requête + réponse | **optionnel en entrée** : si absent, le backend en génère un (UUID v4) ; toujours renvoyé en réponse et stocké dans `ErrorResponse.correlationId` + les logs techniques (AGENTS.md §15) |
 | `Authorization: Bearer <JWT>` | requête | **hors périmètre de l'itération 1** (voir §1.3) |
@@ -56,8 +56,8 @@ contrat uniquement, aucun code d'implémentation).
 
 | Issue du `POST /api/v1/requests` | Persistance |
 |---|---|
-| `400` — enveloppe invalide (`ERR_PAYLOAD_INVALIDE`, `ERR_DOCUMENT_TYPE_NON_SUPPORTE`) | **non persistée** (aucun `requestId`) |
-| `400` — règle métier violée (ex. `ERR_DATE_FUTUR`, `ERR_NOM_CONCORDANCE_IDENTIQUE`, `ERR_CHAMP_INCONNU`) | **persistée**, `status = REJECTED`, `requestId` retourné (audit) |
+| `400` — enveloppe invalide (`ERR_PAYLOAD_INVALIDE`, `ERR_DOCUMENT_TYPE_NON_SUPPORTE`, **clé racine inconnue** `ERR_CHAMP_INCONNU`) | **non persistée** (aucun `requestId`, aucune `DocumentRequest` créée, **jamais** `REJECTED` — arbitrage F-04, cohérent F-03 §3.3) |
+| `400` — règle métier violée **dans `data`** (ex. `ERR_DATE_FUTUR`, `ERR_NOM_CONCORDANCE_IDENTIQUE`, clé inconnue **dans `data`** `ERR_CHAMP_INCONNU`) | **persistée**, `status = REJECTED`, `requestId` retourné (audit) |
 | `422` — champs obligatoires manquants | **persistée**, `status = MISSING_INFORMATION`, `requestId` retourné (permet le suivi de la collecte) |
 | `201` — tout est valide | **persistée**, `status = VALIDATED` |
 
@@ -268,6 +268,7 @@ exécute la validation déterministe et retourne le statut résultant.
 | `201 Created` | `RequestStatusResponse` (`status = VALIDATED`, `missingFields = []`) | Toutes les règles passent |
 | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Enveloppe invalide (JSON malformé, `documentType` inconnu → **non persistée**) **ou** règle métier violée (`fieldErrors[]` → **persistée en `REJECTED`**, `requestId` retourné) |
 | `422 Unprocessable Entity` | `ErrorResponse` (`code = MISSING_INFORMATION`, `missingFields[]`) | ≥ 1 champ obligatoire absent → **persistée en `MISSING_INFORMATION`**, `requestId` retourné |
+| `413 Payload Too Large` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Corps dépassant la taille maximale (`app.document.max-payload-bytes`, défaut 65 536 octets) → rejeté avant désérialisation, **non persistée** (documentation D2 ; valable pour tout endpoint à corps) |
 | `500 Internal Server Error` | `ErrorResponse` (`code = DATABASE_ERROR` \| `INTERNAL_ERROR`) | Erreur technique ; `correlationId` obligatoire |
 
 Exemple `422` :
