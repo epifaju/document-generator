@@ -331,7 +331,8 @@ champs présents dans le corps sont modifiés.
 | Code | Corps | Condition |
 |---|---|---|
 | `200 OK` | `RequestStatusResponse` (statut recalculé) | Statut **net** recalculé après fusion : `MISSING_INFORMATION` → `VALIDATED` si les 6 champs obligatoires sont désormais tous présents et toutes les règles passent (T5) ; `MISSING_INFORMATION` conservé sinon (T6b) ; `VALIDATED` conservé (T11) ou rétrogradé (`MISSING_INFORMATION` T7 / `REJECTED` T10) ; `FAILED` repris (T12 / T12c) |
-| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[]`) | Clé inconnue (`ERR_CHAMP_INCONNU`) ou règle métier violée par les données fusionnées → `status = REJECTED` (persistée, transitions T4 / T6 / T10 / T12b) |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[].code = ERR_CHAMP_INCONNU` \| `ERR_CHAMP_RESERVE`) | **Clé inconnue ou réservée = erreur structurelle de requête** (arbitrage humain F-03) : `document_request` **non modifié**, **jamais** passé à `REJECTED`, aucune mutation métier persistée (un événement d'audit technique sans PII reste possible) |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[]`) | Règle métier violée par les données fusionnées → `status = REJECTED` (persistée, transitions T4 / T6 / T10 / T12b) |
 | `404 Not Found` | `ErrorResponse` (`code = REQUEST_NOT_FOUND`) | Demande inconnue |
 | `409 Conflict` | `ErrorResponse` (`code = REQUEST_ALREADY_CLOSED`) | Statut terminal : `GENERATED` ou `REJECTED` — demande close, aucune modification possible |
 | `500 Internal Server Error` | `ErrorResponse` (`code = DATABASE_ERROR` \| `INTERNAL_ERROR`) | Erreur technique ; `correlationId` obligatoire |
