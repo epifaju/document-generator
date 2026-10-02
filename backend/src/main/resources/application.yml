@@ -1,0 +1,55 @@
+# Configuration du service — itération 1.
+# Aucun secret commité : credentials injectés par variables d'environnement
+# (docker/.env ou shell local) — AGENTS.md §13.
+
+spring:
+  application:
+    name: document-generator
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/adgendoc}
+    username: ${SPRING_DATASOURCE_USERNAME:adgendoc}
+    password: ${SPRING_DATASOURCE_PASSWORD:change_me_local_only}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+
+  flyway:
+    enabled: true
+    # Relatif au répertoire de travail (backend/ en local) ; surchargeable via
+    # MIGRATIONS_DIR (/app/migrations en Docker) — architecture.md R-05 / ADR-04.
+    locations: filesystem:${MIGRATIONS_DIR:../database/migrations}
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+    include-exception: false
+
+app:
+  document:
+    storage-path: ${DOCUMENT_STORAGE_PATH:./storage}
+    template-dir: ${TEMPLATE_DIR:../templates}
+    max-payload-bytes: ${DOCUMENT_MAX_PAYLOAD_BYTES:65536}
+  extraction:
+    schema-path: classpath:prompts/extraction/attestation_concordance.schema.json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
+logging:
+  level:
+    root: INFO
+    com.adgendoc: INFO

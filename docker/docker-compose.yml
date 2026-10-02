@@ -1,0 +1,115 @@
+# Phase J — docs/architecture.md §10.1 (+ §10.2, ADR-04)
+# Usage :
+#   docker compose -f docker/docker-compose.yml --env-file docker/.env up -d --build
+#   docker compose -f docker/docker-compose.yml --env-file docker/.env --profile ollama up -d
+# Aucun secret en dur : toutes les valeurs sensibles viennent de docker/.env.
+
+name: adgendoc
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-adgendoc}
+      POSTGRES_USER: ${POSTGRES_USER:-adgendoc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant (copier docker/.env.example vers docker/.env)}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - internal
+    # DÉCISION Phase J : le port 5432 n'est PAS publié par défaut.
+    # La base n'est accessible que depuis le réseau interne (backend).
+    # Publication hôte réservée au debug local (profil dev) :
+    # décommenter ci-dessous UNIQUEMENT dans ce cas, en liaison loopback.
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    image: adgendoc-backend:it1
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-adgendoc}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-adgendoc}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant (copier docker/.env.example vers docker/.env)}
+      MIGRATIONS_DIR: /app/migrations
+      APP_DOCUMENT_STORAGE_PATH: /data/storage
+      TEMPLATE_DIR: /app/templates
+    volumes:
+      - storage-data:/data/storage
+      - ../templates:/app/templates:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - internal
+
+  n8n:
+    image: n8nio/n8n:${N8N_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: ${N8N_BASIC_AUTH_ACTIVE:-true}
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:?N8N_BASIC_AUTH_PASSWORD manquant (copier docker/.env.example vers docker/.env)}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-CHANGE_ME_openssl_rand_hex_32}
+      NODE_FUNCTION_ALLOW_BUILTIN: fs
+      PROMPTS_DIR: ${PROMPTS_DIR:-/prompts}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8080}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ../prompts:/prompts:ro
+      - ../n8n/workflows:/workflows:ro
+    ports:
+      - "5678:5678"
+    networks:
+      - internal
+
+  ollama:
+    image: ollama/ollama
+    restart: unless-stopped
+    profiles:
+      - ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - internal
+
+networks:
+  internal:
+    name: adgendoc-internal
+    driver: bridge
+    # DÉCISION Phase J : internal: true non posé. Ce réseau relie backend,
+    # postgres, n8n et ollama (aucun autre service hors projet) ; un
+    # internal:true couperait l'egress nécessaire à `ollama pull` et aux
+    # mises à jour n8n. L'isolation repose sur la non-publication des ports
+    # (5432 non publié, cf. poste postgres) et sur l'absence d'autres services.
+
+volumes:
+  pgdata:
+  storage-data:
+  n8n-data:
+  ollama-data:
