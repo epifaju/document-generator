@@ -301,6 +301,24 @@ class DocumentGenerationServiceTest {
         assertThat(auditPort.actions).isEmpty();
     }
 
+    @Test
+    void list_documents_returns_documents_generated_for_the_request() {
+        DocumentRequest request = storedRequest(RequestStatus.VALIDATED);
+        service.generate(request.getRequestId());
+
+        List<GeneratedDocument> documents = service.listDocuments(request.getRequestId());
+
+        assertThat(documents).hasSize(1);
+        assertThat(documents.get(0).getRequestId()).isEqualTo(request.getRequestId());
+    }
+
+    @Test
+    void list_documents_is_empty_when_nothing_generated() {
+        DocumentRequest request = storedRequest(RequestStatus.VALIDATED);
+
+        assertThat(service.listDocuments(request.getRequestId())).isEmpty();
+    }
+
     private DocumentRequest storedRequest(RequestStatus status) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("documentType", DOCUMENT_TYPE);
