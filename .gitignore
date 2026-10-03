@@ -1,6 +1,9 @@
 backend/target/
 target/
-storage/
+# Stockage document runtime uniquement (racine et backend/) — NE PAS
+# ignorer backend/src/main/java/**/storage/ (paquet source Java).
+/storage/
+/backend/storage/
 docker/.env
 *.log
 .idea/
