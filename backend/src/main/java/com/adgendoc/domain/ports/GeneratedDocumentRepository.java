@@ -13,4 +13,7 @@ public interface GeneratedDocumentRepository {
     Optional<GeneratedDocument> findByIdAndRequestId(UUID documentId, UUID requestId);
 
     List<GeneratedDocument> findByRequestId(UUID requestId);
+
+    /** Suppression compensatoire d'une ligne créée dans la même génération. */
+    void delete(UUID documentId);
 }

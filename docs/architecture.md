@@ -230,21 +230,23 @@ Notes d'implémentation JPA associées :
 
 ```sql
 -- V2__seed_template.sql — seed du template pilote.
--- IMPORTANT : le checksum est calculé APRÈS création de
--- templates/attestation_concordance_v1.docx :
---   PowerShell : (Get-FileHash -Algorithm SHA256 <fichier>).Hash.ToLower()
--- La valeur ci-dessous est un placeholder 64 zéros à remplacer avant exécution.
--- En exécution, mismatch checksum ⇒ TEMPLATE_NOT_FOUND (jamais de document
--- produit à partir d'un template altéré).
+-- Checksum SHA-256 RÉEL de templates/attestation_concordance_v1.docx
+-- (template technique NON APPROUVÉ POUR PRODUCTION — OQ-1 toujours ouvert).
+-- POLITIQUE FLYWAY : une base de développement ayant appliqué l'ancienne V2
+-- (placeholder 64×'0') échouera « Migration checksum mismatch » à
+-- l'amorçage (volontaire, jamais masqué) → recréer la base (préféré) ou
+-- flyway repair manuel et contrôlé, UNIQUEMENT sur base de développement
+-- connue. Jamais de repair automatique sur base inconnue/production.
 
 INSERT INTO template_registry (code, version, file_path, checksum, active)
 VALUES (
     'ATTESTATION_CONCORDANCE',
     '1.0',
     'attestation_concordance_v1.docx',
-    '0000000000000000000000000000000000000000000000000000000000000000',
+    'e98a91339d2aa093bc42a4a3b9c989b5f2127a67b3789d8c803af011cc9ebc29',
     TRUE
-);
+)
+ON CONFLICT DO NOTHING;
 ```
 
 ---
@@ -911,8 +913,8 @@ Ordre imposé : chaque phase dépend des précédentes.
 **Phase A — base de données (`database-engineer`)**
 
 1. `database/migrations/V1__init.sql` (DDL §3.1 exact)
-2. `database/migrations/V2__seed_template.sql` (§3.2 — placeholder checksum,
-   remplacé en Phase G)
+2. `database/migrations/V2__seed_template.sql` (§3.2 — checksum SHA-256
+   réel du template, renseigné en Phase G)
 
 **Phase B — fondations backend (`backend-developer`)**
 
@@ -1049,7 +1051,7 @@ Ordre imposé : chaque phase dépend des précédentes.
 | R-01 | DDL `JSONB`/`TEXT[]` non mappés correctement → échec `ddl-auto: validate` | Démarrage backend | `@JdbcTypeCode(SqlTypes.JSON/ARRAY)` imposés (§3.1) ; vérif Docker obligatoire Phase L |
 | R-02 | Aucun test de migration dans `mvn test` (pas de Docker, ADR-09) | DDL cassé non détecté par CI unitaire | Vérification Docker Phase L ; Testcontainers/`@SpringBootTest` reportés it.2 |
 | R-03 | POI : tokens `{{...}}` scindés sur plusieurs `XWPFRun` → remplacement partiel | DOCX avec placeholders résiduels | Algorithme §6.2.3 (reconstruction paragraphe) ; `DocumentGenerationServiceTest` + test de non-résidu sur le template généré |
-| R-04 | Checksum `V2` placeholder 60×`0` si oubli de mise à jour | Toute génération → `TEMPLATE_NOT_FOUND` | Étape explicite Phase G (fichier 60) ; vérification du checksum à chaque génération |
+| R-04 | Checksum `V2` désaligné du fichier template (template modifié après seed, ou ancienne V2 placeholder 64×`0`) | Génération → `TEMPLATE_NOT_FOUND` (safe) ou échec Flyway validation en amorçage | **Résiduel** : checksum réel `e98a91…9ebc29` seedé (Phase G) ; mismatch ⇒ refus déterministe §6.2 ; base dev ayant l'ancienne V2 ⇒ recréer ou `flyway repair` manuel contrôlé (jamais automatique) |
 | R-05 | Chemin Flyway relatif au working directory (`../database/migrations`) | Flyway ne trouve pas les migrations selon le lancement | `MIGRATIONS_DIR` surchargeable ; Docker = `/app/migrations` (§10.1) ; noté dans `application.yml` |
 | R-06 | ~~Divergence `API_CONTRACTS` §2.4 (`dd/MM/yyyy` toléré en extraction) vs schéma ISO §8 (instruction d'architecture)~~ | Rejet E8 d'une extraction en format FR | **RÉSOLU — décision humaine F-07 / R-06** : schéma E8 strictement ISO-8601 (`dd/MM/yyyy` = format d'entrée E1 toléré avant normalisation backend uniquement) ; **aucune règle métier de conversion de date en n8n** ; corrigé dans `API_CONTRACTS.md` §2.4/§2.6, §7.1 (nœud 4) et §8 |
 | R-07 | OQ-4 : liste des particules de normalisation (N6) non vérifiée pour toutes les origines de noms | Capitalisation incorrecte de noms | Choix technique documenté, `REQUIRES_BUSINESS_VALIDATION` — pas de blocage dev, revue métier avant prod |

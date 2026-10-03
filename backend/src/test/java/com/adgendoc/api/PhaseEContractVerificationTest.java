@@ -720,6 +720,11 @@ class PhaseEContractVerificationTest {
             }
             return documents;
         }
+
+        @Override
+        public void delete(UUID documentId) {
+            store.remove(documentId);
+        }
     }
 
     private static final class RecordingTemplateRepository implements TemplateRepository {
@@ -750,6 +755,11 @@ class PhaseEContractVerificationTest {
                 throw new IllegalStateException("Fichier absent : " + storagePath);
             }
             return content;
+        }
+
+        @Override
+        public void delete(String storagePath) {
+            files.remove(storagePath);
         }
     }
 

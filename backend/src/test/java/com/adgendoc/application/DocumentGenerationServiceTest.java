@@ -319,6 +319,141 @@ class DocumentGenerationServiceTest {
         assertThat(service.listDocuments(request.getRequestId())).isEmpty();
     }
 
+    // ------------------------------------------------------------------
+    // F2 — stratégie de compensation (aucune atomicité DB/filesystem)
+    // ------------------------------------------------------------------
+
+    @Test
+    void generate_storage_failure_marks_failed_and_persists_nothing() {
+        DocumentRequest request = storedRequest(RequestStatus.VALIDATED);
+        DocumentGenerationService failing = new DocumentGenerationService(
+                requestRepository, documentRepository, templateRepository,
+                new ChecksumVerifyingTemplateEngine(templateDirectory),
+                new FailingDocumentStorage(), auditPort, CLOCK);
+
+        assertThatThrownBy(() -> failing.generate(request.getRequestId()))
+                .isInstanceOf(DocumentGenerationException.class)
+                .hasFieldOrPropertyWithValue("errorCode",
+                        ErrorCode.DOCUMENT_GENERATION_ERROR);
+
+        assertThat(documentRepository.findByRequestId(request.getRequestId())).isEmpty();
+        assertThat(requestRepository.store.get(request.getRequestId()).getStatus())
+                .isEqualTo(RequestStatus.FAILED);
+        assertThat(auditPort.actions).contains("DOCUMENT_GENERATION_FAILED");
+    }
+
+    @Test
+    void generate_insert_failure_deletes_the_stored_file() {
+        DocumentRequest request = storedRequest(RequestStatus.VALIDATED);
+        FailingSaveDocumentRepository failingRepository =
+                new FailingSaveDocumentRepository();
+        DocumentGenerationService failing = new DocumentGenerationService(
+                requestRepository, failingRepository, templateRepository,
+                new ChecksumVerifyingTemplateEngine(templateDirectory),
+                documentStorage, auditPort, CLOCK);
+
+        assertThatThrownBy(() -> failing.generate(request.getRequestId()))
+                .isInstanceOf(DocumentGenerationException.class);
+
+        // Fichier écrit mais INSERT en échec ⇒ compensation : plus de fichier.
+        assertThat(documentStorage.files).isEmpty();
+        assertThat(failingRepository.saved).isEmpty();
+        assertThat(requestRepository.store.get(request.getRequestId()).getStatus())
+                .isEqualTo(RequestStatus.FAILED);
+    }
+
+    @Test
+    void generate_transition_failure_compensates_row_and_file() {
+        DocumentRequest request = storedRequest(RequestStatus.VALIDATED);
+        FailingOnceRequestRepository failingRequests =
+                new FailingOnceRequestRepository(requestRepository);
+        failingRequests.failNextSave = true;
+        DocumentGenerationService failing = new DocumentGenerationService(
+                failingRequests, documentRepository, templateRepository,
+                new ChecksumVerifyingTemplateEngine(templateDirectory),
+                documentStorage, auditPort, CLOCK);
+
+        assertThatThrownBy(() -> failing.generate(request.getRequestId()))
+                .isInstanceOf(DocumentGenerationException.class);
+
+        // Ligne générée ET fichier supprimés (compensation best-effort) ;
+        // l'état status n'est pas revendiqué ici : la transition GENERATED
+        // a échoué côté persistance (DB inchangée = VALIDATED en réel).
+        assertThat(documentRepository.findByRequestId(request.getRequestId())).isEmpty();
+        assertThat(documentStorage.files).isEmpty();
+        assertThat(auditPort.actions).contains("DOCUMENT_GENERATION_FAILED");
+    }
+
+    private static final class FailingDocumentStorage implements DocumentStorage {
+
+        @Override
+        public String store(UUID requestId, UUID documentId, byte[] content) {
+            throw new DocumentGenerationException(
+                    "Echec d'ecriture simule (test F2).");
+        }
+
+        @Override
+        public byte[] read(String storagePath) {
+            throw new IllegalStateException("Absent");
+        }
+
+        @Override
+        public void delete(String storagePath) {
+            // rien stocké
+        }
+    }
+
+    private static final class FailingSaveDocumentRepository
+            implements GeneratedDocumentRepository {
+
+        private final List<GeneratedDocument> saved = new ArrayList<>();
+
+        @Override
+        public GeneratedDocument save(GeneratedDocument document) {
+            throw new DocumentGenerationException("Echec INSERT simule (test F2).");
+        }
+
+        @Override
+        public Optional<GeneratedDocument> findByIdAndRequestId(UUID documentId,
+                                                                UUID requestId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<GeneratedDocument> findByRequestId(UUID requestId) {
+            return List.copyOf(saved);
+        }
+
+        @Override
+        public void delete(UUID documentId) {
+            // aucune ligne créée
+        }
+    }
+
+    private static final class FailingOnceRequestRepository implements RequestRepository {
+
+        private final RequestRepository delegate;
+        private boolean failNextSave;
+
+        private FailingOnceRequestRepository(RequestRepository delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public DocumentRequest save(DocumentRequest request) {
+            if (failNextSave) {
+                failNextSave = false;
+                throw new IllegalStateException("Echec persistance transitoire (test F2).");
+            }
+            return delegate.save(request);
+        }
+
+        @Override
+        public Optional<DocumentRequest> findById(UUID requestId) {
+            return delegate.findById(requestId);
+        }
+    }
+
     private DocumentRequest storedRequest(RequestStatus status) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("documentType", DOCUMENT_TYPE);
@@ -430,6 +565,11 @@ class DocumentGenerationServiceTest {
             }
             return documents;
         }
+
+        @Override
+        public void delete(UUID documentId) {
+            store.remove(documentId);
+        }
     }
 
     private static final class RecordingTemplateRepository implements TemplateRepository {
@@ -466,6 +606,11 @@ class DocumentGenerationServiceTest {
                 throw new IllegalStateException("Fichier absent : " + storagePath);
             }
             return content;
+        }
+
+        @Override
+        public void delete(String storagePath) {
+            files.remove(storagePath);
         }
     }
 

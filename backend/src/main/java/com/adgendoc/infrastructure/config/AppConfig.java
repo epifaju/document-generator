@@ -12,8 +12,8 @@ import com.adgendoc.domain.ports.GeneratedDocumentRepository;
 import com.adgendoc.domain.ports.RequestRepository;
 import com.adgendoc.domain.ports.TemplateEngine;
 import com.adgendoc.domain.ports.TemplateRepository;
-import com.adgendoc.infrastructure.docx.UnavailableTemplateEngine;
-import com.adgendoc.infrastructure.storage.UnavailableDocumentStorage;
+import com.adgendoc.infrastructure.docx.PoiTemplateEngine;
+import com.adgendoc.infrastructure.storage.FileSystemStorageAdapter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -26,10 +26,10 @@ import java.time.Clock;
  * {@code application} et de {@code domain} restent pures (aucune annotation
  * framework), les beans sont déclarés ici avec injection par constructeur.
  *
- * <p>Phase F1 : {@code TemplateEngine} et {@code DocumentStorage} sont des
- * <b>placeholders</b> (classes {@code Unavailable*}) — les implémentations
- * réelles ({@code PoiTemplateEngine}, {@code FileSystemStorageAdapter}) sont
- * hors périmètre F1.</p>
+ * <p>Phase F2 : {@code PoiTemplateEngine} (vérification SHA-256 + fusion
+ * déterministe) et {@code FileSystemStorageAdapter} (stockage sous
+ * {@code app.document.storage-path}) sont câblés avec les propriétés
+ * {@code app.document.*}.</p>
  */
 @Configuration
 @EnableConfigurationProperties(AppProperties.class)
@@ -86,15 +86,13 @@ public class AppConfig {
         return new RequestResponseMapper(validationService, generationService);
     }
 
-    /** Placeholder F1 : remplacé par {@code PoiTemplateEngine} (phase ultérieure). */
     @Bean
-    public TemplateEngine templateEngine() {
-        return new UnavailableTemplateEngine();
+    public TemplateEngine templateEngine(AppProperties properties) {
+        return new PoiTemplateEngine(properties.getDocument().getTemplateDir());
     }
 
-    /** Placeholder F1 : remplacé par {@code FileSystemStorageAdapter} (phase ultérieure). */
     @Bean
-    public DocumentStorage documentStorage() {
-        return new UnavailableDocumentStorage();
+    public DocumentStorage documentStorage(AppProperties properties) {
+        return new FileSystemStorageAdapter(properties.getDocument().getStoragePath());
     }
 }

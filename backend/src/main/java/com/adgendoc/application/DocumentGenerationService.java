@@ -83,13 +83,22 @@ public class DocumentGenerationService {
             }
 
             UUID documentId = UUID.randomUUID();
+            // Ordre volontaire fichier → base : un échec d'INSERT ne laisse
+            // qu'un fichier à compenser (jamais une ligne business à supprimer
+            // silencieusement). Stratégie documentée §6.3 / rapport F2.
             String storagePath = documentStorage.store(requestId, documentId, content);
             GeneratedDocument document = new GeneratedDocument(documentId, requestId, storagePath,
                     DOCX_MIME_TYPE, content.length, sha256Hex(content), Instant.now(clock));
-            generatedDocumentRepository.save(document);
-
-            request.transitionTo(RequestStatus.GENERATED, List.of(), Instant.now(clock));
-            requestRepository.save(request);
+            boolean documentSaved = false;
+            try {
+                generatedDocumentRepository.save(document);
+                documentSaved = true;
+                request.transitionTo(RequestStatus.GENERATED, List.of(), Instant.now(clock));
+                requestRepository.save(request);
+            } catch (RuntimeException failure) {
+                compensate(requestId, documentId, storagePath, documentSaved);
+                throw failure;
+            }
             Map<String, Object> details = new LinkedHashMap<>();
             details.put("documentId", documentId.toString());
             details.put("byteSize", document.getByteSize());
@@ -98,6 +107,31 @@ public class DocumentGenerationService {
         } catch (RuntimeException exception) {
             markFailed(request, exception);
             throw asGenerationFailure(exception);
+        }
+    }
+
+    /**
+     * Compensation best-effort (aucune atomicité DB/filesystem possible) :
+     * supprime la ligne {@code generated_document} éventuellement créée puis
+     * le fichier stocké. Un échec de compensation est journalisé (identifiants
+     * + code d'erreur uniquement, jamais de contenu) et n'escamote pas
+     * l'erreur d'origine.
+     */
+    private void compensate(UUID requestId, UUID documentId, String storagePath,
+                            boolean documentSaved) {
+        if (documentSaved) {
+            try {
+                generatedDocumentRepository.delete(documentId);
+            } catch (RuntimeException secondary) {
+                LOGGER.warn("Compensation base impossible : requestId={} documentId={}",
+                        requestId, documentId);
+            }
+        }
+        try {
+            documentStorage.delete(storagePath);
+        } catch (RuntimeException secondary) {
+            LOGGER.warn("Compensation fichier impossible : requestId={} documentId={}",
+                    requestId, documentId);
         }
     }
 

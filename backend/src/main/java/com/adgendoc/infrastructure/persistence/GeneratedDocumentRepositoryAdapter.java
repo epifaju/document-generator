@@ -40,4 +40,10 @@ public class GeneratedDocumentRepositoryAdapter implements GeneratedDocumentRepo
                 .map(GeneratedDocumentMapper::toDomain)
                 .toList();
     }
+
+    @Override
+    @Transactional
+    public void delete(UUID documentId) {
+        repository.deleteById(documentId);
+    }
 }

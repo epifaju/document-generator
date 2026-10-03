@@ -7,8 +7,10 @@ import com.adgendoc.infrastructure.persistence.AuditLogJpaRepository;
 import com.adgendoc.infrastructure.persistence.DocumentRequestEntity;
 import com.adgendoc.infrastructure.persistence.DocumentRequestJpaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,10 +18,19 @@ import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -53,6 +64,17 @@ class PostgresPersistenceIT {
 
     private static final String API = "/api/v1/requests";
     private static final String DOCUMENT_TYPE = "ATTESTATION_CONCORDANCE";
+    private static final Path REPOSITORY_TEMPLATE_DIR = Path.of("..", "templates");
+    private static final String TEMPLATE_FILE = "attestation_concordance_v1.docx";
+
+    /** Stockage des tests : jamais le stockage réel du développeur (§9). */
+    @TempDir
+    static Path storageRoot;
+
+    @DynamicPropertySource
+    static void documentStorageProperties(DynamicPropertyRegistry registry) {
+        registry.add("app.document.storage-path", () -> storageRoot.toString());
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -313,20 +335,82 @@ class PostgresPersistenceIT {
     }
 
     // ------------------------------------------------------------------
-    // 5 — V2 : seed présent, checksum placeholder explicite (R-04) —
-    //     ce test ne prétend PAS que le template est prêt (F1 : pas de DOCX)
+    // 5 — V2 : seed présent, checksum = SHA-256 RÉEL du template versionné
+    //     (R-04) — le template reste un template de dev NON APPROUVÉ (F1/F2)
     // ------------------------------------------------------------------
 
     @Test
-    void v2_seed_template_exists_with_explicit_placeholder_checksum() {
+    void v2_seed_checksum_equals_real_sha256_of_versioned_template()
+            throws IOException {
         String checksum = jdbcTemplate.queryForObject(
                 "SELECT checksum FROM template_registry WHERE code = ? AND version = ?",
                 String.class, DOCUMENT_TYPE, "1.0");
-        assertThat(checksum).isEqualTo("0".repeat(64));
+        byte[] templateBytes = Files.readAllBytes(
+                REPOSITORY_TEMPLATE_DIR.resolve(TEMPLATE_FILE));
+        assertThat(checksum).isEqualTo(sha256Hex(templateBytes));
         Boolean active = jdbcTemplate.queryForObject(
                 "SELECT active FROM template_registry WHERE code = ? AND version = ?",
                 Boolean.class, DOCUMENT_TYPE, "1.0");
         assertThat(active).isTrue();
+    }
+
+    // ------------------------------------------------------------------
+    // 6 — Génération documentaire sur PostgreSQL réel : template réel,
+    //     checksum réel, PoiTemplateEngine, FileSystemStorageAdapter
+    //     (@TempDir), generated_document persisté, récupération + POI
+    // ------------------------------------------------------------------
+
+    @Test
+    void document_generation_runs_end_to_end_on_postgres() throws Exception {
+        String createResponse = mockMvc.perform(post(API)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("VALIDATED"))
+                .andReturn().getResponse().getContentAsString();
+        UUID requestId = UUID.fromString(objectMapper.readTree(createResponse)
+                .get("requestId").asText());
+
+        String generateResponse = mockMvc.perform(post(API + "/" + requestId + "/generate"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("GENERATED"))
+                .andReturn().getResponse().getContentAsString();
+        UUID documentId = UUID.fromString(objectMapper.readTree(generateResponse)
+                .get("documentId").asText());
+
+        String storedSha = jdbcTemplate.queryForObject(
+                "SELECT sha256 FROM generated_document WHERE document_id = ?",
+                String.class, documentId);
+        assertThat(storedSha).matches("[0-9a-f]{64}");
+
+        Path storedFile = storageRoot.resolve(requestId.toString())
+                .resolve(documentId + ".docx");
+        assertThat(storedFile).exists();
+
+        byte[] downloaded = mockMvc.perform(get(API + "/" + requestId
+                        + "/documents/" + documentId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        assertThat(sha256Hex(downloaded)).isEqualTo(storedSha);
+
+        try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(downloaded))) {
+            StringBuilder text = new StringBuilder();
+            document.getParagraphs().forEach(p -> text.append(p.getText()).append('\n'));
+            assertThat(text.toString())
+                    .contains("Maria").contains("Gomes")
+                    .contains(requestId.toString())
+                    .contains("NON APPROUVÉ POUR PRODUCTION");
+            assertThat(text.toString()).doesNotContain("{{");
+        }
+    }
+
+    private String sha256Hex(byte[] content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(content));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new AssertionError(exception);
+        }
     }
 
     // ------------------------------------------------------------------

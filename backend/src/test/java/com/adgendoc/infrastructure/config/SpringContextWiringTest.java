@@ -16,12 +16,12 @@ import com.adgendoc.domain.ports.GeneratedDocumentRepository;
 import com.adgendoc.domain.ports.RequestRepository;
 import com.adgendoc.domain.ports.TemplateEngine;
 import com.adgendoc.domain.ports.TemplateRepository;
-import com.adgendoc.infrastructure.docx.UnavailableTemplateEngine;
+import com.adgendoc.infrastructure.docx.PoiTemplateEngine;
 import com.adgendoc.infrastructure.persistence.AuditAdapter;
 import com.adgendoc.infrastructure.persistence.GeneratedDocumentRepositoryAdapter;
 import com.adgendoc.infrastructure.persistence.RequestRepositoryAdapter;
 import com.adgendoc.infrastructure.persistence.TemplateRepositoryAdapter;
-import com.adgendoc.infrastructure.storage.UnavailableDocumentStorage;
+import com.adgendoc.infrastructure.storage.FileSystemStorageAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -35,11 +35,11 @@ import java.time.ZoneOffset;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Phase F1 — test de câblage Spring : le contexte complet démarre avec les
+ * Phase F2 — test de câblage Spring : le contexte complet démarre avec les
  * adapters de persistance réels (aucun mock), les beans applicatifs injectés
- * par {@code AppConfig}, et les placeholders F1 documentés pour le DOCX.
- * Profil {@code test} (H2) : le schéma PostgreSQL réel est validé par le gate
- * séparé {@code PostgresPersistenceIT}.
+ * par {@code AppConfig}, et les adapters documentaires réels (POI +
+ * filesystem). Profil {@code test} (H2) : le schéma PostgreSQL réel est
+ * validé par le gate séparé {@code PostgresPersistenceIT}.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -98,19 +98,21 @@ class SpringContextWiringTest {
     }
 
     /**
-     * F1 : ni {@code PoiTemplateEngine} ni {@code FileSystemStorageAdapter}
-     * ne doivent exister — seuls les placeholders {@code Unavailable*} sont
-     * câblés (périmètre F1 : HTTP → … → PostgreSQL, sans DOCX).
+     * F2 : les implémentations réelles sont câblées —
+     * {@code PoiTemplateEngine} (DOCX + checksum) et
+     * {@code FileSystemStorageAdapter} ; les placeholders {@code Unavailable*}
+     * de F1 n'existent plus.
      */
     @Test
-    void phase_f1_uses_docx_placeholders_not_forbidden_implementations() {
+    void phase_f2_wires_real_docx_implementations() {
         assertThat(context.getBean(TemplateEngine.class))
-                .isInstanceOf(UnavailableTemplateEngine.class);
+                .isInstanceOf(PoiTemplateEngine.class);
         assertThat(context.getBean(DocumentStorage.class))
-                .isInstanceOf(UnavailableDocumentStorage.class);
-        assertThat(doesNotExist("com.adgendoc.infrastructure.docx.PoiTemplateEngine")).isTrue();
-        assertThat(doesNotExist(
-                "com.adgendoc.infrastructure.storage.FileSystemStorageAdapter")).isTrue();
+                .isInstanceOf(FileSystemStorageAdapter.class);
+        assertThat(doesNotExist("com.adgendoc.infrastructure.docx.UnavailableTemplateEngine"))
+                .isTrue();
+        assertThat(doesNotExist("com.adgendoc.infrastructure.storage.UnavailableDocumentStorage"))
+                .isTrue();
     }
 
     private boolean doesNotExist(String className) {
