@@ -1,0 +1,20 @@
+# Profil de test hors-ligne (gate principal Maven, sans Docker) :
+# H2 en mémoire, schéma généré par Hibernate (ddl-auto: create-drop),
+# Flyway désactivé — V1__init.sql est du PostgreSQL et n'est pas exécuté ici.
+# La preuve du schéma PostgreSQL réel (migration + ddl-auto: validate) est
+# produite par le gate PostgreSQL séparé (PostgresPersistenceIT).
+spring:
+  datasource:
+    url: jdbc:h2:mem:adgendoc_test;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    show-sql: false
+
+  flyway:
+    enabled: false
