@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -138,13 +139,35 @@ public class ValidationService {
             return errors;
         }
         for (String key : data.keySet()) {
-            if (RESERVED_FIELD.equals(key)) {
-                errors.add(fieldError(key, ErrorCode.ERR_CHAMP_RESERVE));
-            } else if (!KNOWN_FIELDS.contains(key)) {
-                errors.add(fieldError(key, ErrorCode.ERR_CHAMP_INCONNU));
+            if (RESERVED_FIELD.equals(key) || !KNOWN_FIELDS.contains(key)) {
+                errors.add(fieldError(key, refusalCode(key)));
             }
         }
         return errors;
+    }
+
+    /**
+     * Classification des clés inconnues de l'enveloppe racine (F-05) :
+     * source unique des codes {@code ERR_CHAMP_RESERVE} /
+     * {@code ERR_CHAMP_INCONNU} — toute clé racine hors contrat est refusée,
+     * aucune n'est jamais une donnée métier légitime.
+     */
+    public List<FieldError> checkEnvelopeKeys(Collection<String> envelopeKeys) {
+        List<FieldError> errors = new ArrayList<>();
+        if (envelopeKeys == null) {
+            return errors;
+        }
+        for (String key : envelopeKeys) {
+            errors.add(fieldError(key, refusalCode(key)));
+        }
+        return errors;
+    }
+
+    /** Code d'classification d'une clé refusée : réservée d'abord, sinon inconnue. */
+    private ErrorCode refusalCode(String key) {
+        return RESERVED_FIELD.equals(key)
+                ? ErrorCode.ERR_CHAMP_RESERVE
+                : ErrorCode.ERR_CHAMP_INCONNU;
     }
 
     public Map<String, Object> knownFieldsOnly(Map<String, Object> data) {

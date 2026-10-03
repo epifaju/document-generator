@@ -8,8 +8,6 @@ import com.adgendoc.api.dto.RequestStatusResponse;
 import com.adgendoc.application.DocumentContent;
 import com.adgendoc.application.DocumentGenerationService;
 import com.adgendoc.application.RequestService;
-import com.adgendoc.application.ValidationOutcome.FieldError;
-import com.adgendoc.application.ValidationRejectedException;
 import com.adgendoc.domain.DocumentRequest;
 import com.adgendoc.domain.ErrorCode;
 import com.adgendoc.domain.GeneratedDocument;
@@ -31,7 +29,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,28 +61,15 @@ public class DocumentRequestController {
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody CreateRequestRequest body,
                                     HttpServletRequest http) {
-        List<FieldError> envelopeErrors = envelopeKeyErrors(body.getUnknownFields());
-        if (!envelopeErrors.isEmpty()) {
-            throw new ValidationRejectedException(envelopeErrors);
-        }
-
+        String correlationId = CorrelationIdFilter.currentCorrelationId(http);
         DocumentRequest request = requestService.create(
                 body.getDocumentType(),
                 toObjectMap(body.getData()),
                 toObjectMap(body.getExtraction()),
-                CorrelationIdFilter.currentCorrelationId(http));
-
-        String correlationId = CorrelationIdFilter.currentCorrelationId(http);
-        return switch (request.getStatus()) {
-            case VALIDATED -> ResponseEntity.status(HttpStatus.CREATED)
-                    .body(mapper.toStatusResponse(request));
-            case MISSING_INFORMATION -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(mapper.toMissingResponse(request, correlationId));
-            case REJECTED -> ResponseEntity.badRequest().body(mapper.toRejectedResponse(
-                    request, correlationId, toObjectMap(body.getData())));
-            default -> ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(errorBody(ErrorCode.INTERNAL_ERROR, correlationId));
-        };
+                body.getUnknownFields() == null ? null : body.getUnknownFields().keySet(),
+                correlationId);
+        return statusResponse(request, correlationId, HttpStatus.CREATED,
+                toObjectMap(body.getData()));
     }
 
     @GetMapping("/{requestId}")
@@ -111,15 +95,7 @@ public class DocumentRequestController {
     public ResponseEntity<?> validate(@PathVariable UUID requestId, HttpServletRequest http) {
         DocumentRequest request = requestService.validate(requestId);
         String correlationId = CorrelationIdFilter.currentCorrelationId(http);
-        return switch (request.getStatus()) {
-            case VALIDATED -> ResponseEntity.ok(mapper.toStatusResponse(request));
-            case MISSING_INFORMATION -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(mapper.toMissingResponse(request, correlationId));
-            case REJECTED -> ResponseEntity.badRequest()
-                    .body(mapper.toRejectedResponse(request, correlationId));
-            default -> ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(errorBody(ErrorCode.INTERNAL_ERROR, correlationId));
-        };
+        return statusResponse(request, correlationId, HttpStatus.OK, null);
     }
 
     @PostMapping("/{requestId}/generate")
@@ -141,23 +117,31 @@ public class DocumentRequestController {
                 .body(content.bytes());
     }
 
+    /**
+     * Mapping unique statut métier → réponse HTTP (E1 et E4, F-05) : 201/200
+     * selon l'endpoint, 422 si information manquante, 400 si rejet, 500 sinon.
+     *
+     * @param rawData données brutes fournies à la création (recalcul des
+     *                erreurs de clés, V2) ; {@code null} en E3/E4
+     */
+    private ResponseEntity<?> statusResponse(DocumentRequest request, String correlationId,
+                                             HttpStatus successStatus,
+                                             Map<String, Object> rawData) {
+        return switch (request.getStatus()) {
+            case VALIDATED -> ResponseEntity.status(successStatus)
+                    .body(mapper.toStatusResponse(request));
+            case MISSING_INFORMATION -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(mapper.toMissingResponse(request, correlationId));
+            case REJECTED -> ResponseEntity.badRequest()
+                    .body(mapper.toRejectedResponse(request, correlationId, rawData));
+            default -> ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorBody(ErrorCode.INTERNAL_ERROR, correlationId));
+        };
+    }
+
     private ErrorResponse errorBody(ErrorCode code, String correlationId) {
         return new ErrorResponse(code.name(), code.getMessage(), correlationId,
                 List.of(), null, null, List.of(), null);
-    }
-
-    private List<FieldError> envelopeKeyErrors(Map<String, JsonNode> unknownFields) {
-        if (unknownFields == null || unknownFields.isEmpty()) {
-            return List.of();
-        }
-        List<FieldError> errors = new ArrayList<>();
-        for (String key : unknownFields.keySet()) {
-            ErrorCode code = "referenceDemande".equals(key)
-                    ? ErrorCode.ERR_CHAMP_RESERVE
-                    : ErrorCode.ERR_CHAMP_INCONNU;
-            errors.add(new FieldError(key, code, code.getMessage(key)));
-        }
-        return errors;
     }
 
     private Map<String, Object> mergedPatch(PatchRequestRequest body) {

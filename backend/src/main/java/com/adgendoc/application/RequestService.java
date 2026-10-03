@@ -9,6 +9,7 @@ import com.adgendoc.domain.exceptions.RequestNotFoundException;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,23 @@ public class RequestService {
 
     public DocumentRequest create(String documentType, Map<String, Object> data,
                                   Map<String, Object> extraction, String correlationId) {
+        return create(documentType, data, extraction, null, correlationId);
+    }
+
+    /**
+     * @param unknownEnvelopeKeys clés racine inconnues capturées par le DTO
+     *                            (F-05 : la classification des codes vit
+     *                            dans {@code ValidationService}, pas dans le
+     *                            controller) ; refusées avant toute création.
+     */
+    public DocumentRequest create(String documentType, Map<String, Object> data,
+                                  Map<String, Object> extraction,
+                                  Collection<String> unknownEnvelopeKeys,
+                                  String correlationId) {
+        List<FieldError> envelopeErrors = validationService.checkEnvelopeKeys(unknownEnvelopeKeys);
+        if (!envelopeErrors.isEmpty()) {
+            throw new ValidationRejectedException(envelopeErrors);
+        }
         ValidationOutcome envelope = validationService.checkDocumentType(documentType);
         if (!envelope.persistable()) {
             throw notPersistable(documentType, envelope.fieldErrors());
