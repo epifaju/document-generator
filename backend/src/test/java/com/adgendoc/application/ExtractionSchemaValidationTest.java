@@ -377,14 +377,13 @@ class ExtractionSchemaValidationTest {
 
     /**
      * Le schéma d'EXTRACTION impose le pattern ISO (architecture §8) :
-     * « le {@code pattern} ISO impose que le nœud 4 ({@code ParseExtraction})
-     * de n8n convertisse {@code dd/MM/yyyy} → {@code yyyy-MM-dd} avant E8 »
-     * (docs/architecture.md §8 ; la conversion reste supportée côté backend
-     * pour E1 direct — S03, via {@code NormalizationService}) avant que le
-     * payload d'extraction n'atteigne ce schéma. <b>Divergence ouverte F-07 /
-     * R-06</b> : {@code API_CONTRACTS.md §2.4 et §2.6} tolèrent encore
-     * {@code dd/MM/yyyy} sur la sortie d'extraction — arbitrage humain requis.
-     * Comportement attendu ici, conforme au schéma : <b>INVALID</b>.
+     * « le {@code pattern} ISO est strict » — n8n ne porte aucune règle de
+     * conversion de date (décision humaine F-07 / R-06), la conversion des
+     * formats d'entrée {@code dd/MM/yyyy} → {@code yyyy-MM-dd} reste côté
+     * backend pour E1 direct (S03, via {@code NormalizationService}).
+     * <b>F-07 / R-06 RÉSOLUS</b> : {@code API_CONTRACTS.md §2.4 / §2.6} a été
+     * corrigé — la sortie d'extraction est strictement ISO-8601. Comportement
+     * attendu ici, conforme au schéma : <b>INVALID</b>.
      */
     @Test
     @DisplayName("9. dateNaissance \"12/05/1985\" → INVALID côté schéma d'extraction (pattern ISO)")

@@ -538,7 +538,7 @@ aucune credential** (AGENTS.md §11) ; URLs via variables d'environnement
 | 1 | `Webhook` | Webhook (`POST /webhook/document-generation`, `responseMode: responseNode`) | entrée conversationnelle `{message, requestId?}` |
 | 2 | `LoadPrompt` | Code — `fs.readFileSync('/prompts/extraction/system_prompt_attestation_concordance.md')` (volume monté en lecture seule, `NODE_FUNCTION_ALLOW_BUILTIN=fs`) | charge le prompt versionné — **source unique = `prompts/`** |
 | 3 | `OllamaExtract` | HTTP Request → `POST {OLLAMA_BASE_URL}/api/chat` (modèle via `OLLAMA_MODEL`, `format` = schéma §8, `retryOnFail: true, maxTries: 3`) | extraction structurée |
-| 4 | `ParseExtraction` | Code | `JSON.parse` strict ; échec ⇒ `AI_EXTRACTION_ERROR` (aucune récupération « au mieux ») ; conversion défensive `dd/MM/yyyy → yyyy-MM-dd` sur `dateNaissance` **uniquement si format reconnu** (sinon valeur telle quelle → le backend rejettera) |
+| 4 | `ParseExtraction` | Code | `JSON.parse` strict ; échec ⇒ `AI_EXTRACTION_ERROR` (aucune récupération « au mieux ») ; **aucune conversion de date en n8n** (décision F-07 / R-06 : la normalisation métier appartient au backend) — le prompt impose la sortie ISO et le schéma E8 l'impose |
 | 5 | `ValidateExtraction` | HTTP Request → **E8** `POST /api/v1/extraction/validate` | garde de forme |
 | 6 | `IF schemaValid` | IF | `valid=false` ⇒ réponse erreur `AI_EXTRACTION_ERROR` à l'utilisateur, aucune création |
 | 7 | `CreateRequest` | HTTP Request → **E1** `POST /api/v1/requests` (`retryOnFail` sur 5xx) | création |
@@ -669,9 +669,12 @@ Contenu exact à écrire :
 
 Notes d'interface :
 
-- le `pattern` ISO impose que le nœud 4 (`ParseExtraction`) de n8n convertisse
-  `dd/MM/yyyy` → `yyyy-MM-dd` avant E8 (cf. §14 R-06) ; la conversion reste
-  supportée côté backend pour E1 direct (S03) ;
+- le `pattern` ISO est strict : la sortie d'extraction doit être `yyyy-MM-dd`
+  (le prompt d'extraction l'impose au modèle) ; n8n **ne porte aucune règle
+  métier de conversion de date** (décision F-07 / R-06) — une extraction encore
+  en `dd/MM/yyyy` est rejetée par E8 (`AI_EXTRACTION_ERROR`) ; la conversion
+  des formats d'entrée `dd/MM/yyyy` → `yyyy-MM-dd` reste l'affaire de la
+  normalisation backend pour E1 direct (S03) ;
 - validateur Java : `com.networknt:json-schema-validator` (draft 2020-12)
   dans `ExtractionValidationService` — contrôle de **forme uniquement** ;
   la validation métier complète reste l'exclusive de `POST /requests` (E1).
@@ -1048,7 +1051,7 @@ Ordre imposé : chaque phase dépend des précédentes.
 | R-03 | POI : tokens `{{...}}` scindés sur plusieurs `XWPFRun` → remplacement partiel | DOCX avec placeholders résiduels | Algorithme §6.2.3 (reconstruction paragraphe) ; `DocumentGenerationServiceTest` + test de non-résidu sur le template généré |
 | R-04 | Checksum `V2` placeholder 60×`0` si oubli de mise à jour | Toute génération → `TEMPLATE_NOT_FOUND` | Étape explicite Phase G (fichier 60) ; vérification du checksum à chaque génération |
 | R-05 | Chemin Flyway relatif au working directory (`../database/migrations`) | Flyway ne trouve pas les migrations selon le lancement | `MIGRATIONS_DIR` surchargeable ; Docker = `/app/migrations` (§10.1) ; noté dans `application.yml` |
-| R-06 | Divergence `API_CONTRACTS` §2.4 (`dd/MM/yyyy` toléré en extraction) vs schéma ISO §8 (instruction d'architecture) | Rejet E8 d'une extraction en format FR | Conversion défensive n8n (nœud 4, §7.1) + E1 tolère toujours `dd/MM/yyyy` (S03) ; à confirmer à la revue |
+| R-06 | ~~Divergence `API_CONTRACTS` §2.4 (`dd/MM/yyyy` toléré en extraction) vs schéma ISO §8 (instruction d'architecture)~~ | Rejet E8 d'une extraction en format FR | **RÉSOLU — décision humaine F-07 / R-06** : schéma E8 strictement ISO-8601 (`dd/MM/yyyy` = format d'entrée E1 toléré avant normalisation backend uniquement) ; **aucune règle métier de conversion de date en n8n** ; corrigé dans `API_CONTRACTS.md` §2.4/§2.6, §7.1 (nœud 4) et §8 |
 | R-07 | OQ-4 : liste des particules de normalisation (N6) non vérifiée pour toutes les origines de noms | Capitalisation incorrecte de noms | Choix technique documenté, `REQUIRES_BUSINESS_VALIDATION` — pas de blocage dev, revue métier avant prod |
 | R-08 | OQ-5 : seuil de `confidence` indéfini | Extraction peu fiable acceptée | `confidence` = audit seulement en it.1 ; décision n8n/ai-engineer reportée |
 | R-09 | OQ-API-4 : `data` complet renvoyé par E2 (PII) | Minimisation des données | Escalade security tracée ; it.1 conformément au contrat, décision avant prod |

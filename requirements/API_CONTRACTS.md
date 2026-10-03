@@ -198,7 +198,7 @@ cf. ordre du contrat pilote §6.)*
 |---|---|---|---|
 | `documentType` | string (enum) | oui | doit être supporté |
 | `confidence` | number | oui | 0..1 ; métadonnée, jamais source de vérité |
-| `data` | object | oui | `additionalProperties: false` ; même schéma que `CreateRequestRequest.data` ; `dateNaissance` peut encore être au format `dd/MM/yyyy` (normalisation backend) |
+| `data` | object | oui | `additionalProperties: false` ; mêmes clés que `CreateRequestRequest.data` ; `dateNaissance` **strictement ISO-8601** `yyyy-MM-dd` (pattern du schéma d'extraction) — `dd/MM/yyyy` est rejeté par E8 et reste uniquement un format d'entrée toléré par E1 avant normalisation backend (décision F-07 / R-06) |
 | `missingFields` | string[] | oui | sous-ensemble des clés obligatoires ; l'IA **signalera** les absences, elle ne les comblera jamais |
 
 ### 2.5 `GenerateDocumentResponse`
@@ -229,6 +229,13 @@ cf. ordre du contrat pilote §6.)*
   ]
 }
 ```
+
+> **Note F-07 / R-06** : le message `ERR_DATE_FORMAT_INVALIDE` est celui du
+> `ErrorCode` partagé avec E1 et rappelle les formats d'**entrée** acceptés par
+> `POST /requests` (`yyyy-MM-dd`, `dd/MM/yyyy`). La contrainte appliquée par E8
+> elle-même est strictement ISO-8601 (schéma d'extraction, §2.4 et
+> `docs/architecture.md` §8) : une extraction livrée en `dd/MM/yyyy` est rejetée
+> ici, sans conversion en n8n.
 
 ### 2.7 `HealthResponse`
 
