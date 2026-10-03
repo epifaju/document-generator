@@ -1,0 +1,8 @@
+# Application Context Initializers
+#
+# Phase H.1 — fail-fast du secret de base de donnees (AGENTS.md §13) :
+# le demarrage est refuse si SPRING_DATASOURCE_PASSWORD est absente alors
+# qu'un datasource PostgreSQL est configure. Agit apres le chargement de
+# application.yml et avant la creation de tout bean.
+org.springframework.context.ApplicationContextInitializer=\
+com.adgendoc.infrastructure.config.DatasourceSecretGuard

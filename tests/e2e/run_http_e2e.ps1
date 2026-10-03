@@ -1,4 +1,4 @@
-# Phase H — gate E2E HTTP (preuve du vertical slice sur serveur réel).
+# Phase H-HTTP — gate E2E HTTP (preuve du vertical slice sur serveur réel).
 #
 # Ce script N'ordonne ni PostgreSQL ni Spring Boot : il vérifie que le serveur
 # attendu répond déjà (échec rapide et explicite sinon), puis exécute le gate

@@ -3,6 +3,7 @@ package com.adgendoc.e2e;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -10,6 +11,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.Socket;
+import java.net.SocketException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -25,6 +33,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
@@ -32,8 +41,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * <b>GATE HTTP E2E — phase H</b> (exécuté SÉPARÉMENT du gate hors-ligne et du
- * gate PostgreSQL, serveur Spring Boot + PostgreSQL 16 réels requis) :
+ * <b>GATE HTTP E2E — Phase H-HTTP (HTTP Vertical Slice E2E)</b> (exécuté
+ * SÉPARÉMENT du gate hors-ligne et du gate PostgreSQL, serveur Spring Boot +
+ * PostgreSQL 16 réels requis) :
  *
  * <pre>
  * mvn -o -f backend/pom.xml test -Dtest=HttpVerticalSliceIT
@@ -132,6 +142,63 @@ class HttpVerticalSliceIT {
                 .isEqualTo(sha256Hex(Files.readAllBytes(referenceTemplate)));
 
         client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    }
+
+    // ------------------------------------------------------------------
+    // 0 — Périmètre restreint contrôlé (contrat API §1.3, architecture §12)
+    // ------------------------------------------------------------------
+
+    /**
+     * Le serveur ne doit répondre QUE sur le loopback : aucune adresse IPv4
+     * non-loopback de la machine ne doit ouvrir une connexion vers le port du
+     * serveur. Preuve comportementale du « périmètre restreint » que le contrat
+     * impose à l'itération 1 (AGENTS.md §13 : l'accès au document doit être
+     * restreint). Sauté (et non vacu) si la machine n'a aucune interface
+     * non-loopback.
+     */
+    @Test
+    @Order(15)
+    void service_answers_only_on_loopback() {
+        int port = portOfBaseUrl();
+        List<InetAddress> remoteAddresses = nonLoopbackIpv4Addresses();
+        Assumptions.assumeFalse(remoteAddresses.isEmpty(),
+                "aucune adresse IPv4 non-loopback sur cette machine : preuve impossible");
+        for (InetAddress address : remoteAddresses) {
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress(address, port), 1000);
+                org.junit.jupiter.api.Assertions.fail(
+                        "le serveur accepte une connexion non-loopback sur " + address.getHostAddress()
+                                + ":" + port + " — périmètre restreint violé");
+            } catch (IOException expected) {
+                // Refus de connexion / expiration : conforme (aucune écoute hors loopback).
+            }
+        }
+    }
+
+    private static int portOfBaseUrl() {
+        URI uri = URI.create(BASE_URL);
+        return uri.getPort() > 0 ? uri.getPort() : ("https".equals(uri.getScheme()) ? 443 : 80);
+    }
+
+    private static List<InetAddress> nonLoopbackIpv4Addresses() {
+        List<InetAddress> addresses = new ArrayList<>();
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces != null && interfaces.hasMoreElements()) {
+                Enumeration<InetAddress> attached = interfaces.nextElement().getInetAddresses();
+                while (attached.hasMoreElements()) {
+                    InetAddress address = attached.nextElement();
+                    if (address instanceof Inet4Address
+                            && !address.isLoopbackAddress()
+                            && !address.isLinkLocalAddress()) {
+                        addresses.add(address);
+                    }
+                }
+            }
+        } catch (SocketException unavailable) {
+            return List.of();
+        }
+        return addresses;
     }
 
     // ------------------------------------------------------------------

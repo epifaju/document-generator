@@ -760,19 +760,21 @@ administrative.
 
 | Service | Image / build | Ports | Volumes | Healthcheck | Profil |
 |---|---|---|---|---|---|
-| `postgres` | `postgres:16-alpine` | `5432:5432` | `postgres_data:/var/lib/postgresql/data` | `pg_isready -U $POSTGRES_USER -d $POSTGRES_DB` (5 s, 10 retries) | défaut |
-| `backend` | `build: {context: ., dockerfile: backend/Dockerfile}` | `8080:8080` | `storage_data:/app/storage` + `./templates:/app/templates:ro` | `curl -fsS http://localhost:8080/api/v1/health` | défaut |
-| `n8n` | `n8nio/n8n:${N8N_VERSION:-latest}` | `5678:5678` | `n8n_data:/home/node/.n8n` + `./prompts:/prompts:ro` + `./n8n/workflows:/workflows:ro` | `wget -qO- http://localhost:5678/healthz` | défaut |
-| `ollama` | `ollama/ollama` | `11434:11434` | `ollama_data:/root/.ollama` | `ollama list` | **`ollama`** (optionnel) |
+| `postgres` | `postgres:16-alpine` | **aucune publication** (loopback `127.0.0.1:5432` commentée, debug uniquement) | `pgdata:/var/lib/postgresql/data` | `pg_isready -U $POSTGRES_USER -d $POSTGRES_DB` (5 s, 10 retries, start 10 s) | défaut |
+| `backend` | `build: {context: .., dockerfile: backend/Dockerfile}` | `127.0.0.1:8080:8080` | `storage-data:/data/storage` + `../templates:/app/templates:ro` | `curl -fsS http://localhost:8080/actuator/health` (10 s, 10 retries, start 40 s) | défaut |
+| `n8n` | `n8nio/n8n:${N8N_VERSION:-latest}` | `5678:5678` | `n8n-data:/home/node/.n8n` + `../prompts:/prompts:ro` + `../n8n/workflows:/workflows:ro` | aucune (`depends_on: service_started`) | défaut |
+| `ollama` | `ollama/ollama` | `11434:11434` | `ollama-data:/root/.ollama` | aucune | **`ollama`** (optionnel) |
 
 Détails d'assemblage :
 
-- réseau bridge unique `adgendoc-net` ; aucun service en `privileged` ;
+- réseau bridge unique `adgendoc-internal` ; aucun service en `privileged` ;
 - `backend` : `depends_on: postgres: condition: service_healthy` ;
   env `SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}`,
   `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`,
-  `MIGRATIONS_DIR=/app/migrations`, `DOCUMENT_STORAGE_PATH=/app/storage`,
-  `TEMPLATE_DIR=/app/templates` ;
+  `MIGRATIONS_DIR=/app/migrations`, `APP_DOCUMENT_STORAGE_PATH=/data/storage`,
+  `TEMPLATE_DIR=/app/templates`,
+  `SERVER_BIND_ADDRESS="0.0.0.0"` (littéral, **intérieur** conteneur — le bind
+  par défaut côté hôte est `127.0.0.1`, cf. §12) ;
 - `n8n` : `depends_on: backend` ; env `BACKEND_BASE_URL=http://backend:8080`,
   `OLLAMA_BASE_URL=http://ollama:11434`, `OLLAMA_MODEL`, `N8N_ENCRYPTION_KEY`,
   `NODE_FUNCTION_ALLOW_BUILTIN=fs` ;
@@ -787,17 +789,37 @@ Détails d'assemblage :
 
 ### 10.2 `docker/.env.example` (aucun secret réel)
 
+Bloc **verbatim** du fichier `docker/.env.example` :
+
 ```env
 # docker/.env.example — copier vers docker/.env (docker/.env JAMAIS commité)
+# AUCUN secret réel : placeholders uniquement, à remplacer avant usage.
+
+# --- PostgreSQL (ADR-03) ---
 POSTGRES_DB=adgendoc
 POSTGRES_USER=adgendoc
-POSTGRES_PASSWORD=change_me_local_only
-SPRING_DATASOURCE_USERNAME=adgendoc
-SPRING_DATASOURCE_PASSWORD=change_me_local_only
-N8N_ENCRYPTION_KEY=replace_by_openssl_rand_hex_32
+POSTGRES_PASSWORD=CHANGE_ME
+
+# --- n8n (§10.1) ---
 N8N_VERSION=latest
+N8N_BASIC_AUTH_ACTIVE=true
+N8N_BASIC_AUTH_USER=admin
+N8N_BASIC_AUTH_PASSWORD=CHANGE_ME
+# openssl rand -hex 32
+N8N_ENCRYPTION_KEY=CHANGE_ME_openssl_rand_hex_32
+
+# --- URLs / chemins (variables du workflow n8n, §7) ---
+BACKEND_BASE_URL=http://backend:8080
+OLLAMA_BASE_URL=http://ollama:11434
 OLLAMA_MODEL=llama3.1
+# Chemin DANS le conteneur n8n (montage ../prompts:/prompts:ro).
+PROMPTS_DIR=/prompts
 ```
+
+Le mot de passe du backend n'y figure pas : `docker-compose.yml` l'injecte via
+`SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?…}`. Hors Docker, définir
+`SPRING_DATASOURCE_PASSWORD` dans l'environnement — le backend **refuse de
+démarrer** sans secret (`DatasourceSecretGuard`, §11.5).
 
 Commandes locales :
 
@@ -887,20 +909,89 @@ docker compose -f docker/docker-compose.yml --env-file docker/.env up -d --build
 curl http://localhost:8080/api/v1/health
 ```
 
+### 11.5 Les trois gates (Phase H-HTTP)
+
+Trois gates **séparés**, exécutés dans cet ordre ; chacun doit être vert avant
+le suivant. **Aucun processus, conteneur ou port ne doit rester actif après un
+gate.**
+
+| # | Gate | Commande | Prérequis | Critère PASS |
+|---|---|---|---|---|
+| 1 | Hors-ligne | `mvn -o -f backend/pom.xml clean test` | JDK 17, **aucun Docker**, **serveur arrêté** (sinon `clean` ne peut pas supprimer le JAR verrouillé) | `Tests run: 269, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS` |
+| 2 | PostgreSQL réel | `mvn -o -f backend/pom.xml test -Dtest=PostgresPersistenceIT` | conteneur PostgreSQL joignable + `SPRING_DATASOURCE_URL` / `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` + `MIGRATIONS_DIR` + `TEMPLATE_DIR` | `Tests run: 13, … 0` + `BUILD SUCCESS` (Flyway V1/V2 puis `ddl-auto: validate`) |
+| 3 | HTTP E2E réel | `powershell -ExecutionPolicy Bypass -File tests/e2e/run_http_e2e.ps1` | serveur Spring Boot **déjà démarré** et sain + PostgreSQL + `E2E_JDBC_PASSWORD` + copie de template hors dépôt + stockage de test | `GATE HTTP E2E: SUCCES`, code de sortie **0**, `Tests run: 11, Failures: 0, Errors: 0` et `Skipped: 0` **ou** `Skipped: 1` (test périmétrique sauté par `Assumption` si l'hôte n'a aucune IPv4 non-loopback) |
+
+**Mise en route du gate 3** (aucun script ne démarre le serveur ; séquence
+manuelle bornée, **l'étape 7 est obligatoire même en cas d'échec**) :
+
+```powershell
+# 1) PostgreSQL de test (identique au gate 2), ex. port 5460
+# 2) build du serveur
+mvn -o -f backend/pom.xml package -DskipTests
+# 3) copie de template HORS dépôt + stockage de test (le gate refuse toute
+#    copie située dans le dépôt : codes 6/7)
+$t = "$env:TEMP\opencode\phaseh\templates"; New-Item -ItemType Directory -Force -Path $t | Out-Null
+Copy-Item templates\attestation_concordance_v1.docx $t -Force
+$s = "$env:TEMP\opencode\phaseh\storage";     New-Item -ItemType Directory -Force -Path $s | Out-Null
+# 4) environnement du serveur — il doit lire LA COPIE (TEMPLATE_DIR), sinon le
+#    scénario « checksum invalide » renvoie 201 au lieu de 500 et le gate échoue
+$env:SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5460/adgendoc'
+$env:SPRING_DATASOURCE_USERNAME='adgendoc'; $env:SPRING_DATASOURCE_PASSWORD='…'
+$env:E2E_JDBC_PASSWORD=$env:SPRING_DATASOURCE_PASSWORD
+$env:MIGRATIONS_DIR="$PWD\database\migrations"
+$env:TEMPLATE_DIR=$t                       # répertoire de la copie
+$env:DOCUMENT_STORAGE_PATH=$s              # stockage de test (=> StorageRoot)
+$env:SERVER_PORT=18099                     # port attendu par le gate
+# 5) démarrage en arrière-plan, PID conservé pour l'étape 7
+$p = Start-Process -FilePath java -ArgumentList '-jar','backend\target\document-generator-1.0.0-SNAPSHOT.jar' -PassThru
+# 6) gate 3 (vérité 60 s sur /actuator/health)
+powershell -ExecutionPolicy Bypass -File tests\e2e\run_http_e2e.ps1 -StorageRoot $s -TemplateFile "$t\attestation_concordance_v1.docx"
+# 7) arrêt : Stop-Process -Id $p.Id -Force   (TOUJOURS, même si le gate échoue)
+```
+
+**Timeouts (toutes les attentes sont bornées) :** santé serveur 60 s
+(`-HealthTimeoutSeconds`, boucle du script qui absorbe aussi l'attente de
+démarrage) ; exécution Maven 900 s (`-MavenTimeoutSeconds`) ; connexion HTTP
+JDK 10 s ; tentative de connexion périmétrique 1 s.
+
+**Lifecycle Spring Boot :** le script du gate 3 **ne démarre ni n'arrête aucun
+serveur** : il vérifie seulement qu'il répond (`/actuator/health` → `200` +
+`"status":"UP"`) et échoue explicitement sinon (code `2`). Le démarrage
+(étape 5) et l'arrêt (étape 7) relèvent de l'opérateur ; l'arrêt doit être
+exécuté **même en cas d'échec** afin de ne laisser aucun processus résiduel.
+
+**Codes de sortie du gate 3 :** `0` PASS · `1` test en échec ou Maven hors
+borne · `2` serveur non sain · `3` `E2E_JDBC_PASSWORD` absente · `4` prérequis
+manquant · `6` copie de template = template versionné · `7` copie de template
+située dans le dépôt.
+
+**Cleanup obligatoire après le gate 3 :** `docker rm -f` du conteneur PostgreSQL
+de test, stockage de test vidé, ports de test fermés (5460 / 18099), aucun
+Spring Boot résiduel, aucun secret commité (`git status` propre).
+
+**Totaux attendus :** 269 (gate 1) + 13 (gate 2) + 11 (gate 3) = **293 tests,
+0 échec**.
+
+**Mode d'échec du secret :** un datasource PostgreSQL sans secret fait échouer le
+démarrage par un `IllegalStateException` explicite, levé **avant** le rafraîchissement
+du contexte (donc avant HikariCP et Flyway). C'est une erreur de
+**démarrage/configuration**, hors taxonomie `AGENTS.md §14` (qui couvre les
+erreurs de requête).
+
 ---
 
 ## 12. Sécurité itération 1
 
 | Mesure | Détail implémentable |
 |---|---|
-| Aucun secret commité | credentials uniquement en variables d'env / `docker/.env` (gitignoré) ; `docker/.env.example` sans valeurs réelles ; export n8n sans `"credentials"` (AGENTS.md §11) |
+| Aucun secret commité | credentials uniquement en variables d'env / `docker/.env` (gitignoré) ; `docker/.env.example` sans valeurs réelles ; export n8n sans `"credentials"` (AGENTS.md §11) ; **`spring.datasource.password` sans défaut committé** + `DatasourceSecretGuard` (Phase H.1) qui refuse explicitement le démarrage d'un datasource PostgreSQL sans `SPRING_DATASOURCE_PASSWORD` |
 | Pas de stack trace client | `GlobalExceptionHandler` renvoie toujours `ErrorResponse` structuré (code, message FR, `correlationId`) ; logs serveur uniquement ; `server.error.include-stacktrace=never`, `include-message=never` |
 | Validation systématique | Bean Validation sur **tous** les DTO d'entrée + `ValidationService` déterministe ; aucune route sans validation d'entrée |
 | Taille max payload | `PayloadSizeLimitFilter` : `app.document.max-payload-bytes` (défaut **65536** octets) → `413` avant désérialisation |
 | Contrôle d'extension fichier | lecture/écriture limitées à `.docx` ; noms de fichiers **uniquement** générés côté serveur (UUID) ; canonicalisation de chemin contre path traversal |
 | Minimisation PII | `audit_log.details` sans données personnelles (uniquement `status`, `errorCode`, `nbMissingFields`, `durationMs`, `documentType`) ; pas de `data` complet dans les logs applicatifs (AGENTS.md §13, OQ-API-4 en escalade) |
-| Réseau Docker | réseau bridge dédié `adgendoc-net` ; PostgreSQL exposé sur `localhost` uniquement ; aucune auth HTTP en it.1 → déploiement périmètre restreint (localhost/réseau interne) |
-| Accès documents | E6 ouvert en it.1 (**risque assumé**, contrat §1.3) ; fermeture obligatoire avant prod → escalade security en fin d'itération 1 |
+| Réseau Docker | réseau bridge dédié `adgendoc-internal` ; PostgreSQL **non publié par défaut** (publication loopback `127.0.0.1:5432` réservée au debug, commentée) ; aucune auth HTTP en it.1 → **périmètre restreint contrôlé** : `server.address` = `${SERVER_BIND_ADDRESS:127.0.0.1}`, publication Docker `127.0.0.1:8080:8080` (jamais `0.0.0.0` côté hôte), `SERVER_BIND_ADDRESS: "0.0.0.0"` **littéral dans le conteneur** (jamais hérité de l'hôte) pour n8n/ollama |
+| Accès documents | E6 ouvert en it.1 (**risque assumé**, contrat §1.3) mais **borné au loopback** (test `service_answers_only_on_loopback`, gate 3) ; fermeture par authentification obligatoire avant prod → escalade security (R-10) |
 | JWT | **reporté it.2** : `Authorization: Bearer` exigé sur tous les endpoints sauf E7 ; chemins déjà conçus sans contexte d'identité implicite |
 | Intégrité template | checksum SHA-256 vérifié à chaque génération ; mismatch ⇒ `TEMPLATE_NOT_FOUND`, aucun document produit |
 
@@ -1040,6 +1131,23 @@ Ordre imposé : chaque phase dépend des précédentes.
 83. vérification : `mvn -f backend/pom.xml test` (sans Docker) → PUIS
     démarrage Docker (migrations Flyway + healthchecks) → lifecycle
     AGENTS.md §7 (tester → reviewer → security)
+
+**Phase H-HTTP — HTTP Vertical Slice E2E** (`backend-developer` + `tester`)
+
+> **Nomenclature :** ce livrable est désigné **Phase H-HTTP** pour lever la
+> collision de nommage avec **Phase H — prompts** (§13 ci-dessus), dont le sens
+> architectural historique est conservé tel quel. `H.1` désigne le durcissement
+> qui suit le commit `cc95d1e`.
+
+84. `backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java` — gate 3,
+    11 scénarios sur serveur TCP/HTTP + PostgreSQL + POI réels
+85. `tests/e2e/run_http_e2e.ps1` — exécuteur borné du gate 3
+86. (H.1) périmètre restreint contrôlé : `server.address`
+    `${SERVER_BIND_ADDRESS:127.0.0.1}`, publication Docker épinglée au loopback
+87. (H.1) fail-fast du secret : `DatasourceSecretGuard`
+    (`META-INF/spring.factories`), `spring.datasource.password` sans défaut
+88. (H.1) `RuntimeSecurityContractTest`, `DatasourceSecretGuardTest`,
+    `RequestLoggingSanitizationTest` + documentation des trois gates (§11.5)
 
 ---
 

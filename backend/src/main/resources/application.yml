@@ -9,7 +9,11 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/adgendoc}
     username: ${SPRING_DATASOURCE_USERNAME:adgendoc}
-    password: ${SPRING_DATASOURCE_PASSWORD:change_me_local_only}
+    # AUCUN défaut (AGENTS.md §13) : aucun mot de passe faible committé.
+    # Un placeholder de configuration résolu « lenientement » par Spring ne
+    # fait PAS échouer le démarrage : DatasourceSecretGuard (spring.factories)
+    # refuse explicitement le démarrage d'un datasource PostgreSQL sans secret.
+    password: ${SPRING_DATASOURCE_PASSWORD}
 
   jpa:
     hibernate:
@@ -25,6 +29,11 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Périmètre restreint contrôlé (contrat API §1.3 « déploiement à périmètre
+  # restreint », architecture §12) : loopback par défaut. Docker ouvre
+  # SERVER_BIND_ADDRESS sur le réseau interne (n8n), la publication de port
+  # reste épinglée au loopback côté hôte.
+  address: ${SERVER_BIND_ADDRESS:127.0.0.1}
   error:
     include-stacktrace: never
     include-message: never
