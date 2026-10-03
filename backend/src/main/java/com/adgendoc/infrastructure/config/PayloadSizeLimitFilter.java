@@ -7,6 +7,7 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -34,7 +35,8 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
 
     private final long maxPayloadBytes;
 
-    public PayloadSizeLimitFilter(long maxPayloadBytes) {
+    public PayloadSizeLimitFilter(@Value("${app.document.max-payload-bytes:65536}")
+                                  long maxPayloadBytes) {
         this.maxPayloadBytes = maxPayloadBytes;
     }
 
