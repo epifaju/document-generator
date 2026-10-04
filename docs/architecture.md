@@ -935,55 +935,109 @@ gate.**
 |---|---|---|---|---|
 | 1 | Hors-ligne | `mvn -o -f backend/pom.xml clean test` | JDK 17, **aucun Docker**, **serveur arrêté** (sinon `clean` ne peut pas supprimer le JAR verrouillé) | `Tests run: 277, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS` |
 | 2 | PostgreSQL réel | `mvn -o -f backend/pom.xml test -Dtest=PostgresPersistenceIT` | conteneur PostgreSQL joignable + `SPRING_DATASOURCE_URL` / `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` + `MIGRATIONS_DIR` + `TEMPLATE_DIR` | `Tests run: 13, … 0` + `BUILD SUCCESS` (Flyway V1/V2 puis `ddl-auto: validate`) |
-| 3 | HTTP E2E réel | `powershell -ExecutionPolicy Bypass -File tests/e2e/run_http_e2e.ps1` | serveur Spring Boot **déjà démarré** et sain + PostgreSQL + `E2E_JDBC_PASSWORD` + copie de template hors dépôt + stockage de test | `GATE HTTP E2E: SUCCES`, code de sortie **0**, `Tests run: 11, Failures: 0, Errors: 0` et `Skipped: 0` **ou** `Skipped: 1` (test périmétrique sauté par `Assumption` si l'hôte n'a aucune IPv4 non-loopback) |
+| 3 | HTTP E2E réel | `powershell -ExecutionPolicy Bypass -File tests/e2e/run_http_e2e.ps1 -ManageServer -ManagePostgres -StorageRoot <s> -TemplateFile <t>` | `E2E_JDBC_PASSWORD` (éphémère, jamais commitée) + copie de template **hors dépôt** + stockage de test + **port 18099 libre** + jar construit (à refaire après le gate 1 `clean`) ; PostgreSQL géré par le script (`-ManagePostgres`, conteneur épinglé `adgendoc-pg-h2` sur `127.0.0.1:5460`) ; le script **démarre et arrête** le serveur (propriétaire de son arbre de processus) | `GATE HTTP E2E: SUCCES`, code de sortie **0**, preuves `TEST_EXIT_CODE=0`, `CLEANUP_EXIT_CODE=0`, `SERVER_STOPPED=True`, `PORT_18099_FREE=True`, `PORT_OWNER_FOREIGN=False`, `PROJECT_JVM_LEFT=0`, `HTTP_TESTS=11` **ou** `Skipped: 1` (test périmétrique sauté par `Assumption` si l'hôte n'a aucune IPv4 non-loopback) |
 
-**Mise en route du gate 3** (aucun script ne démarre le serveur ; séquence
-manuelle bornée, **l'étape 7 est obligatoire même en cas d'échec**) :
+**Mise en route du gate 3 (Phase H.3 — mode géré, aucune étape manuelle de
+démarrage/arrêt)** : avec `-ManageServer`, **le script est le propriétaire du
+serveur** : START → attente bornée → TEST → STOP ARBRE → VÉRIFICATION PORT
+FERMÉ → VÉRIFICATION AUCUNE JVM PROJET → code de sortie.
 
 ```powershell
-# 1) PostgreSQL de test (identique au gate 2), ex. port 5460
-# 2) build du serveur
+# 1) build du serveur (le gate 1 `clean` supprime le JAR : à refaire ici)
 mvn -o -f backend/pom.xml package -DskipTests
-# 3) copie de template HORS dépôt + stockage de test (le gate refuse toute
+# 2) copie de template HORS dépôt + stockage de test (le gate refuse toute
 #    copie située dans le dépôt : codes 6/7)
 $t = "$env:TEMP\opencode\phaseh\templates"; New-Item -ItemType Directory -Force -Path $t | Out-Null
 Copy-Item templates\attestation_concordance_v1.docx $t -Force
 $s = "$env:TEMP\opencode\phaseh\storage";     New-Item -ItemType Directory -Force -Path $s | Out-Null
-# 4) environnement du serveur — il doit lire LA COPIE (TEMPLATE_DIR), sinon le
-#    scénario « checksum invalide » renvoie 201 au lieu de 500 et le gate échoue
-$env:SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5460/adgendoc'
-$env:SPRING_DATASOURCE_USERNAME='adgendoc'; $env:SPRING_DATASOURCE_PASSWORD='…'
-$env:E2E_JDBC_PASSWORD=$env:SPRING_DATASOURCE_PASSWORD
-$env:MIGRATIONS_DIR="$PWD\database\migrations"
-$env:TEMPLATE_DIR=$t                       # répertoire de la copie
-$env:DOCUMENT_STORAGE_PATH=$s              # stockage de test (=> StorageRoot)
-$env:SERVER_PORT=18099                     # port attendu par le gate
-# 5) démarrage en arrière-plan, PID conservé pour l'étape 7
-$p = Start-Process -FilePath java -ArgumentList '-jar','backend\target\document-generator-1.0.0-SNAPSHOT.jar' -PassThru
-# 6) gate 3 (vérité 60 s sur /actuator/health)
-powershell -ExecutionPolicy Bypass -File tests\e2e\run_http_e2e.ps1 -StorageRoot $s -TemplateFile "$t\attestation_concordance_v1.docx"
-# 7) arrêt : Stop-Process -Id $p.Id -Force   (TOUJOURS, même si le gate échoue)
+# 3) secret de test éphémère (jamais commité, jamais imprimé)
+$env:E2E_JDBC_PASSWORD='…'   # conteneur adgendoc-pg-h2, charset [A-Za-z0-9._-] imposé (ligne docker run)
+# 4) gate 3 complet : le script vérifie/crée PostgreSQL, démarre le serveur,
+#    exécute les 11 tests, arrête l'arbre puis vérifie port et JVM.
+powershell -ExecutionPolicy Bypass -File tests\e2e\run_http_e2e.ps1 `
+    -ManageServer -ManagePostgres -StorageRoot $s -TemplateFile "$t\attestation_concordance_v1.docx"
 ```
 
-**Timeouts (toutes les attentes sont bornées) :** santé serveur 60 s
-(`-HealthTimeoutSeconds`, boucle du script qui absorbe aussi l'attente de
-démarrage) ; exécution Maven 900 s (`-MavenTimeoutSeconds`) ; connexion HTTP
-JDK 10 s ; tentative de connexion périmétrique 1 s.
+Aucune étape de « kill » manuelle. Si le port 18099 est déjà occupé au
+lancement, le script **échoue sans tuer le propriétaire** (code `8`) ; le
+propriétaire d'un port qui n'appartient pas à la session est signalé
+(`PORT_OWNER_FOREIGN=True`), jamais tué.
 
-**Lifecycle Spring Boot :** le script du gate 3 **ne démarre ni n'arrête aucun
-serveur** : il vérifie seulement qu'il répond (`/actuator/health` → `200` +
-`"status":"UP"`) et échoue explicitement sinon (code `2`). Le démarrage
-(étape 5) et l'arrêt (étape 7) relèvent de l'opérateur ; l'arrêt doit être
-exécuté **même en cas d'échec** afin de ne laisser aucun processus résiduel.
+**Cycle de vie des processus (Phase H.3) :** `tests/e2e/ServerLifecycle.psm1`
+est l'unique propriétaire de l'arbre de processus du gate :
+
+- `Start-TestServer` : vérifie d'abord que le port est libre (**fail fast**,
+  code `8`), lance le `java.exe` **réel** (`$env:JAVA_HOME\bin\java.exe` — pas
+  le shim `javapath\java.exe` qui spawn un enfant, cause racine de H.3), attend
+  `/actuator/health` → `UP` avec une **deadline** (`-StartupTimeoutSeconds`,
+  60 s par défaut) et vérifie que le listener appartient à la session ;
+- la session (PID racine, descendance, PID d'écoute, heures de démarrage) est
+  publiée **avant toute attente** via `-SessionRef` — y compris sur le chemin
+  d'erreur, qui nettoie elle-même la session ;
+- `Stop-TestServer` : arrêt de l'**arbre** (descendance du plus profond vers la
+  racine, racine en dernier), identité revalidée par `StartTime` (anti
+  réutilisation de PID), puis vérifications **bornées** : port libéré en ≤ 15 s,
+  aucune JVM résiduelle de la session ;
+- `run_http_e2e.ps1 -ManageServer` exécute toujours ce cycle dans son `finally`
+  et garde `TEST_EXIT_CODE` et `CLEANUP_EXIT_CODE` **séparés** : un échec de
+  cleanup ne devient jamais un succès.
+
+**Tests de régression du cycle de vie (Phase H.3, exécutés avant la revue) :**
+
+```powershell
+$env:E2E_JDBC_PASSWORD='…'
+# L1..L7 (70 checks) : start→health→stop→port fermé ; arbre shim→java tous
+# tués ; échec de test simulé avec cleanup complet ; SERVER_PORT divergent
+# (timeout borné + cleanup) ; port occupé (fail fast, occupier non tué,
+# + gate enfant qui rend exit 8 sans rien tuer) ; JVM sans rapport jamais
+# tuée ; gate complet en mode géré.
+powershell -ExecutionPolicy Bypass -File tests\e2e\lifecycle_tests.ps1
+# L8 : 3 cycles consécutifs du gate 3 en mode géré
+powershell -ExecutionPolicy Bypass -File tests\e2e\run_lifecycle_stress.ps1 -Runs 3
+```
+
+Preuves machine-parseables imprimées en fin d'exécution — gate :
+`TEST_EXIT_CODE=`, `CLEANUP_EXIT_CODE=`, `SERVER_STOPPED=`, `PORT_<port>_FREE=`,
+`PORT_OWNER_FOREIGN=`, `PROJECT_JVM_LEFT=`, `HTTP_TESTS=`
+(`PORT_OWNER_FOREIGN` vaut `N/A` en l'absence de session ou si le cleanup a
+échoué ; `PROJECT_JVM_LEFT` vaut `N/A` uniquement quand l'échec du cleanup a
+empêché la mesure, sinon c'est une valeur mesurée — jamais de valeur optimiste
+présentée comme un fait) ; tests de cycle de
+vie : `LIFECYCLE_TESTS L1=PASS … L7=PASS`,
+`LIFECYCLE_TESTS_CHECKS=n PASS=n FAIL=n SKIP=n`, `LIFECYCLE_TESTS_RESULT=` ;
+stress : `RUN=n HTTP_TESTS=… TEST_EXIT=… SERVER_STOPPED=… PORT_18099_FREE=…
+PROJECT_JVM_LEFT=… RESULT=PASS|FAIL` puis `LIFECYCLE_STRESS_RESULT=`.
+
+**Timeouts (toutes les attentes sont bornées) :** démarrage/santé serveur 60 s
+(`-StartupTimeoutSeconds` et `-HealthTimeoutSeconds`) ; exécution Maven 900 s
+(`-MavenTimeoutSeconds`, arbre `cmd → mvn → JVM` tué au dépassement) ;
+scripts PowerShell enfants bornés 900 s avec kill d'arbre
+(`Invoke-PowerShellBounded`, utilisé pour L3/L7/L8) ;
+libération de port 15 s (module) ; `pg_isready` 60 s et `docker info`/`ps` 20 s
+(`Ensure-TestPostgres`) ; connexion HTTP JDK 10 s ; tentative de connexion
+périmétrique 1 s.
 
 **Codes de sortie du gate 3 :** `0` PASS · `1` test en échec ou Maven hors
-borne · `2` serveur non sain · `3` `E2E_JDBC_PASSWORD` absente · `4` prérequis
-manquant · `6` copie de template = template versionné · `7` copie de template
-située dans le dépôt.
+borne · `2` serveur non sain (**mode externe uniquement**, sans `-ManageServer`)
+· `3` `E2E_JDBC_PASSWORD` absente · `4` prérequis manquant · `6` copie de
+template = template versionné · `7` copie de template située dans le dépôt ·
+`8` port occupé ou propriétaire étranger (aucun kill) · `9` démarrage, timeout
+ou échec de lancement du serveur · `10` tests OK **mais** cleanup KO (port ou
+JVM résiduel) · `11` PostgreSQL de test indisponible. Les codes `3/4/6/7`
+s'appliquent **aux deux modes** ; en mode géré ils sont détectés **avant tout
+lancement de JVM** (aucun processus créé pour un prérequis manquant).
 
-**Cleanup obligatoire après le gate 3 :** `docker rm -f` du conteneur PostgreSQL
-de test, stockage de test vidé, ports de test fermés (5460 / 18099), aucun
-Spring Boot résiduel, aucun secret commité (`git status` propre).
+**Mode externe (hérité, sans `-ManageServer`) :** comportement historique
+inchangé — le script ne démarre ni n'arrête aucun serveur, vérifie seulement
+qu'il répond déjà (code `2` sinon) et n'exécute que le gate ; la propriété et
+l'arrêt du processus restent alors à l'opérateur.
+
+**Cleanup obligatoire après le gate 3 :** en mode géré, le script laisse déjà
+le port 18099 fermé et **zéro JVM du projet** (vérifié et attesté par les
+preuves) ; le conteneur PostgreSQL de test peut être arrêté par le script lui-même
+(`-TeardownPostgres`, qui vérifie l'image avant `docker rm -f`) ou à la main
+(`docker rm -f adgendoc-pg-h2`), le stockage de test vidé, le port 5460 fermé,
+et aucun secret commité (`git status` propre).
 
 **Totaux attendus :** 277 (gate 1) + 13 (gate 2) + 11 (gate 3) = **301 tests,
 0 échec**.
@@ -1202,6 +1256,43 @@ Ordre imposé : chaque phase dépend des précédentes.
 91. (H.2, S-3) `N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?…}` sans défaut,
     `docker/.env.example` sans valeur de clé ; preuves `docker compose config`
     (exit 0 avec variable, exit 1 sans elle, §11.5)
+
+**Phase H.3 — cycle de vie Windows des processus de test** (`backend-developer`
+avec `tester`)
+
+> **Périmètre :** uniquement l'harnais de gates (scripts PowerShell + doc §11.5).
+> Aucune règle métier, aucun contrat d'API, aucune migration V1/V2, aucun
+> `n8n/`, `prompts/` ou template DOCX modifié ; aucun changement Java de
+> production (le serveur n'a pas été touché).
+
+92. (H.3) `tests/e2e/ServerLifecycle.psm1` — propriétaire unique du cycle de
+    vie : fail fast sur port occupé (propriétaire **jamais** tué), session
+    publiée avant toute attente (`-SessionRef`, nettoyage sur tous les chemins
+    d'erreur), attente de santé bornée, kill d'arbre avec revalidation
+    `StartTime` (anti réutilisation de PID), vérification bornée du port (15 s)
+    et des JVM résiduelles, preuve du shim `javapath → java.exe` (cause racine),
+    conteneur PostgreSQL épinglé `adgendoc-pg-h2`, exécution bornée d'enfants
+    (`Invoke-PowerShellBounded`) et lecture des preuves (`Get-EvidenceBlock`)
+93. (H.3) `tests/e2e/run_http_e2e.ps1` — modes `-ManageServer` /
+    `-ManagePostgres` (START → WAIT → TEST → STOP → VÉRIFICATIONS, `finally`
+    toujours exécuté), codes `8` port occupé, `9` démarrage/timeout, `10`
+    cleanup KO, `11` PostgreSQL ; bloc de preuves `KEY=VALUE` ; échec explicite
+    si la session est perdue après démarrage (jamais de faux succès) ;
+    comportement du mode externe hérité (`2` + `3/4/6/7`) inchangé ; les codes
+    `3/4/6/7` du mode géré sont levés **avant** tout lancement de JVM
+94. (H.3) `tests/e2e/lifecycle_tests.ps1` — régression L1..L7 (**70 checks**,
+    ASCII pur) : start→health→stop→port fermé ; arbre `shim → java.exe` tué en
+    entier ; échec de test simulé avec cleanup complet ; `SERVER_PORT` divergent
+    (timeout borné + cleanup interne + anti-vacuité) ; port occupé (fail fast,
+    occupier non tué, **gate enfant → exit 8** sans rien tuer, libéré par le
+    test lui-même) ; JVM sans rapport jamais
+    tuée ; gate complet en mode géré (11 tests, code 0)
+95. (H.3) `tests/e2e/run_lifecycle_stress.ps1` — L8 : 3 cycles consécutifs du
+    gate 3 en mode géré, bloc `RUN=n … RESULT=` par cycle + état final des
+    ports/JVM ; code `0` uniquement si les 3 cycles et l'état final sont verts
+96. (H.3) `docs/architecture.md` §11.5 — procédure de gate 3 réécrite en mode
+    géré (propriétaire, timeouts, codes 8/9/10/11, preuves `KEY=VALUE`,
+    tests L1..L8), tableau des gates et index de fichiers §13 mis à jour
 
 ---
 
