@@ -78,7 +78,9 @@ services:
       N8N_BASIC_AUTH_ACTIVE: ${N8N_BASIC_AUTH_ACTIVE:-true}
       N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
       N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:?N8N_BASIC_AUTH_PASSWORD manquant (copier docker/.env.example vers docker/.env)}
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-CHANGE_ME_openssl_rand_hex_32}
+      # Phase H.2 (S-3) : AUCUN défaut faible. La variable est obligatoire et
+      # sans fallback : compose échoue explicitement si elle est absente.
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?N8N_ENCRYPTION_KEY manquant (openssl rand -hex 32, cf. docker/.env.example)}
       NODE_FUNCTION_ALLOW_BUILTIN: fs
       PROMPTS_DIR: ${PROMPTS_DIR:-/prompts}
       BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8080}
@@ -88,8 +90,11 @@ services:
       - n8n-data:/home/node/.n8n
       - ../prompts:/prompts:ro
       - ../n8n/workflows:/workflows:ro
+    # Phase H.2 (S-2) : publication hôte épinglée au loopback. La navigation
+    # locale reste possible (http://127.0.0.1:5678) sans exposer n8n sur le
+    # réseau ; conteneur→conteneur passe par le réseau interne (adgendoc-internal).
     ports:
-      - "5678:5678"
+      - "127.0.0.1:5678:5678"
     networks:
       - internal
 
@@ -98,8 +103,10 @@ services:
     restart: unless-stopped
     profiles:
       - ollama
+    # Phase H.2 (S-2) : idem n8n — loopback only côté hôte, réseau interne
+    # inchangé pour les conteneurs.
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama-data:/root/.ollama
     networks:

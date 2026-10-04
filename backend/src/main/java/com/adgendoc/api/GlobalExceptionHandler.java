@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.HandlerMapping;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -156,8 +157,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DocumentGenerationException.class)
     public ResponseEntity<ErrorResponse> handleGenerationFailure(
             DocumentGenerationException exception, HttpServletRequest http) {
-        LOGGER.error("\u00c9chec de g\u00e9n\u00e9ration [correlationId={}]",
-                correlationId(http), exception);
+        // Phase H.2 S-1 : DocumentGenerationService enveloppe aussi les
+        // DataAccessException (asGenerationFailure) — le message brut (SQL,
+        // valeurs, chemins) ne doit jamais atteindre le niveau ERROR.
+        logTechnicalFailureSafely("\u00c9chec de g\u00e9n\u00e9ration",
+                ErrorCode.DOCUMENT_GENERATION_ERROR, exception, http);
         return respond(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.DOCUMENT_GENERATION_ERROR,
                 ErrorCode.DOCUMENT_GENERATION_ERROR.getMessage(), http,
                 requestIdFrom(http), statusOf(requestIdFrom(http)), List.of());
@@ -166,7 +170,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ErrorResponse> handleDatabase(DataAccessException exception,
                                                         HttpServletRequest http) {
-        LOGGER.error("Erreur de persistance [correlationId={}]", correlationId(http), exception);
+        logTechnicalFailureSafely("Erreur de persistance", ErrorCode.DATABASE_ERROR,
+                exception, http);
         return respond(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.DATABASE_ERROR,
                 ErrorCode.DATABASE_ERROR.getMessage(), http, requestIdFrom(http),
                 statusOf(requestIdFrom(http)), List.of());
@@ -175,10 +180,62 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception exception,
                                                           HttpServletRequest http) {
-        LOGGER.error("Erreur interne non g\u00e9r\u00e9e [correlationId={}]",
-                correlationId(http), exception);
+        logTechnicalFailureSafely("Erreur interne non g\u00e9r\u00e9e", ErrorCode.INTERNAL_ERROR,
+                exception, http);
         return respond(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR,
                 ErrorCode.INTERNAL_ERROR.getMessage(), http, null, null, List.of());
+    }
+
+    /**
+     * Journalisation sûre d'une erreur technique côté serveur (Phase H.2 S-1,
+     * AGENTS.md §13 « ne pas journaliser de données personnelles » et §15).
+     *
+     * <p>Le message d'une exception — base de données, stockage ou génération —
+     * peut contenir des instructions SQL, des valeurs liées, des lignes
+     * retournées, des données personnelles, des chemins ou des credentials
+     * JDBC : il n'est <b>jamais</b> journalisé, ni en argument ni en
+     * {@code throwable}.</p>
+     *
+     * <p>Au niveau ERROR, seules des métadonnées sûres sont émises : résumé
+     * fixe, code applicatif, classe de l'exception, SQLState (code de
+     * {@link java.sql.SQLException}, forme validée) et {@code correlationId}
+     * (normalisé par {@code CorrelationIdFilter}, motif
+     * {@code ^[A-Za-z0-9-]{1,64}$}). La stack trace (donc le message brut)
+     * n'est émise qu'au niveau DEBUG ; la politique de journalisation
+     * packaged ({@code application.yml}) garde la racine à {@code INFO}, donc
+     * elle est coupée en production — prouvée par
+     * {@code DatabaseErrorLogSanitizationTest}.</p>
+     */
+    private void logTechnicalFailureSafely(String summary, ErrorCode errorCode,
+                                           Throwable exception, HttpServletRequest http) {
+        LOGGER.error("{} [errorCode={}, exceptionClass={}, sqlState={}, correlationId={}]",
+                summary, errorCode.name(), exception.getClass().getName(),
+                sqlStateOf(exception), correlationId(http));
+        LOGGER.debug("{} \u2014 stack trace [correlationId={}]",
+                summary, correlationId(http), exception);
+    }
+
+    /**
+     * SQLState de la cause {@link java.sql.SQLException} la plus proche
+     * (profondeur bornée à 10), sinon {@code n/a}. Seule la forme normalisée
+     * SQLSTATE ({@code 1 à 5 alphanumériques}) est retenue : toute autre
+     * valeur vendor non contrôlée est écartée pour préserver le format du
+     * journal.
+     */
+    private String sqlStateOf(Throwable exception) {
+        Throwable current = exception;
+        int depth = 0;
+        while (current != null && depth < 10) {
+            if (current instanceof SQLException sqlException) {
+                String sqlState = sqlException.getSQLState();
+                if (sqlState != null && sqlState.matches("[0-9A-Za-z]{1,5}")) {
+                    return sqlState;
+                }
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return "n/a";
     }
 
     private ResponseEntity<ErrorResponse> respond(HttpStatus httpStatus, ErrorCode code,

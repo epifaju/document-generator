@@ -106,6 +106,141 @@ class RuntimeSecurityContractTest {
     }
 
     // ------------------------------------------------------------------
+    // 2bis — Phase H.2 : S-2 (loopback n8n/ollama) + S-3 (clé n8n sans défaut)
+    // ------------------------------------------------------------------
+
+    @Test
+    void docker_publishes_n8n_and_ollama_on_loopback_only() {
+        String compose = repositoryFile("docker", "docker-compose.yml");
+        assertThat(compose)
+                .as("n8n doit être publié sur 127.0.0.1 uniquement (S-2)")
+                .contains("127.0.0.1:5678:5678");
+        assertThat(compose)
+                .as("ollama doit être publié sur 127.0.0.1 uniquement (S-2)")
+                .contains("127.0.0.1:11434:11434");
+
+        // Vérification ligne à ligne des PUBLICATIONS ACTIVES (commentaires
+        // exclus) : détecte toute forme courte « host:container », y compris
+        // « 0.0.0.0:5678:5678 » ou « 5678:5678 » qu'une assertion de sous-chaîne
+        // simple ne détecterait pas.
+        assertThat(activePortPublications(compose, 8080))
+                .as("le backend doit rester publié en boucle locale")
+                .isNotEmpty()
+                .allSatisfy(line -> assertThat(line).contains("127.0.0.1:"));
+        assertThat(activePortPublications(compose, 5678))
+                .as("n8n doit rester publié en boucle locale (aucune autre forme)")
+                .isNotEmpty()
+                .allSatisfy(line -> assertThat(line).contains("127.0.0.1:"));
+        assertThat(activePortPublications(compose, 11434))
+                .as("ollama doit rester publié en boucle locale (aucune autre forme)")
+                .isNotEmpty()
+                .allSatisfy(line -> assertThat(line).contains("127.0.0.1:"));
+        assertThat(activePortPublications(compose, 5432))
+                .as("PostgreSQL reste NON publié : aucune ligne de publication "
+                        + "active pour 5432 (la ligne de debug est commentée)")
+                .isEmpty();
+
+        assertThat(compose)
+                .as("la communication conteneur→conteneur reste assurée par le "
+                        + "réseau interne (aucune coupure de service)")
+                .contains("BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8080}")
+                .contains("OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}")
+                .contains("adgendoc-internal");
+    }
+
+    /**
+     * Lignes de publication de port <b>actives</b> pour un port donné
+     * (commentaires YAML exclus). Détecte la forme courte
+     * {@code - "hôte:conteneur[:proto]"} <b>et</b> les formes d'évitement :
+     * {@code - "conteneur"} (publication 0.0.0.0 / port éphémère) et
+     * {@code - "conteneur:conteneur/proto}". Les lignes de volumes
+     * (contenant {@code /} dans le chemin) sont écartées.
+     */
+    private static List<String> activePortPublications(String compose, int port) {
+        String barePort = String.valueOf(port);
+        List<String> found = new ArrayList<>();
+        for (String raw : compose.split("\\R")) {
+            String line = raw.trim();
+            if (line.startsWith("#") || !line.startsWith("-")) {
+                continue;
+            }
+            String value = line.replaceFirst("^-\\s*", "").replace("\"", "").trim();
+            // suffixe de protocole éventuel (/tcp, /udp) : ce n'est pas un chemin
+            String candidate = value.replaceFirst("/\\w+$", "");
+            if (candidate.contains("/")) {
+                continue; // volume ou bind-mount, pas une publication de port
+            }
+            if (candidate.equals(barePort) || candidate.endsWith(":" + port)) {
+                found.add(line);
+            }
+        }
+        return found;
+    }
+
+    /** Le détecteur de publication doit lui-même être discriminant. */
+    @Test
+    void active_port_publication_parser_detects_hostile_forms() {
+        String synthetic = """
+                services:
+                  exposed:
+                    ports:
+                      - "0.0.0.0:5678:5678"
+                      - "5678:5678"
+                      - "5678"
+                      - "5678:5678/udp"
+                      - "127.0.0.1:5678:5678"
+                    volumes:
+                      - n8n-data:/home/node/.n8n
+                  debug:
+                    #   - "127.0.0.1:5432:5432"
+                """;
+
+        List<String> found = activePortPublications(synthetic, 5678);
+        assertThat(found)
+                .as("4 formes hostiles + forme loopback détectées, volume ignoré")
+                .hasSize(5);
+        assertThat(found)
+                .anySatisfy(line -> assertThat(line).contains("127.0.0.1:"));
+        assertThat(activePortPublications(synthetic, 5432))
+                .as("la ligne commentée ne compte pas comme publication")
+                .isEmpty();
+    }
+
+    @Test
+    void n8n_encryption_key_has_no_committed_fallback() {
+        String compose = repositoryFile("docker", "docker-compose.yml");
+        assertThat(compose)
+                .as("N8N_ENCRYPTION_KEY doit être exigée sans aucun défaut (S-3)")
+                .contains("N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?");
+        assertThat(compose)
+                .as("aucun fallback faible ne doit subsister dans compose")
+                .doesNotContain("N8N_ENCRYPTION_KEY:-")
+                .doesNotContain("CHANGE_ME_openssl_rand_hex_32");
+    }
+
+    @Test
+    void env_example_carries_no_real_n8n_key_and_no_hex_secret() throws IOException {
+        String envExample = repositoryFile("docker", ".env.example");
+        assertThat(envExample)
+                .as("placeholder vide : copier le fichier sans le renseigner "
+                        + "doit faire échouer compose (fail-fast), jamais hériter "
+                        + "d'une clé faible")
+                .contains("N8N_ENCRYPTION_KEY=")
+                .doesNotContain("N8N_ENCRYPTION_KEY=CHANGE_ME")
+                .doesNotContainPattern("\\b[0-9a-fA-F]{64}\\b");
+        assertThat(repositoryFile("docker", "docker-compose.yml"))
+                .as("aucune clé hexadécimale 256-bit ne doit être committée")
+                .doesNotContainPattern("\\b[0-9a-fA-F]{64}\\b");
+    }
+
+    @Test
+    void docker_env_file_is_gitignored() {
+        assertThat(repositoryFile(".gitignore"))
+                .as("docker/.env (secrets locaux) doit rester ignoré par Git")
+                .containsPattern("(?m)^docker/\\.env$");
+    }
+
+    // ------------------------------------------------------------------
     // 3 — Aucune donnée technique sensible dans la configuration emballée
     // ------------------------------------------------------------------
 
@@ -137,6 +272,20 @@ class RuntimeSecurityContractTest {
                 .contains("include-exception: false")
                 .contains("show-details: never")
                 .contains("show-sql: false");
+    }
+
+    /**
+     * Phase H.2 (S-1) : Hibernate recopie le message SQL brut — énoncé et,
+     * pour les contraintes PostgreSQL, les valeurs concernées (donc PII) — en
+     * ERROR via {@code SqlExceptionHelper}. Ce canal doit être coupé dans la
+     * configuration emballée : seuls les métadonnées sûres de
+     * {@code GlobalExceptionHandler} décrivent une erreur de base.
+     */
+    @Test
+    void hibernate_raw_sql_error_echo_is_silenced() {
+        assertThat(applicationYaml())
+                .as("l'écho SQL brut d'Hibernate doit être désactivé (S-1)")
+                .contains("org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF");
     }
 
     // ------------------------------------------------------------------

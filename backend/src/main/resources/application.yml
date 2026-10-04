@@ -62,3 +62,9 @@ logging:
   level:
     root: INFO
     com.adgendoc: INFO
+    # Phase H.2 (S-1) : Hibernate recopie le message SQL brut (énoncé et,
+    # pour les codes contrainte PostgreSQL, les valeurs concernées) en ERROR.
+    # Ce canal est coupé : la journalisation des erreurs de base passe
+    # exclusivement par GlobalExceptionHandler (métadonnées sûres : classe,
+    # SQLState, code applicatif, correlationId ; stack trace en DEBUG uniquement).
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF

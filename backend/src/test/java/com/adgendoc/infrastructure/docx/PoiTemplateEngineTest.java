@@ -174,10 +174,16 @@ class PoiTemplateEngineTest {
 
         byte[] merged = fixtureEngine.merge(fixtureTemplate(custom), Map.of());
 
-        assertThat(new String(merged, java.nio.charset.StandardCharsets.UTF_8))
-                .doesNotContain("{{");
+        // L'invariant « aucun résidu {{ }} » est vérifié sur le CONTENU du
+        // document (paragraphes réouverts), pas sur les octets ZIP compressés :
+        // ces octets varient d'une exécution à l'autre (horodatage POI dans
+        // docProps/core.xml) et le flux deflate peut contenir « {{ » par
+        // hasard — assertion non déterministe, déjà observée fautive sur le
+        // checkpoint 6544074 (preuve baseline, Phase H.2).
         try (XWPFDocument document = reopen(merged)) {
-            assertThat(documentText(document).trim()).isEqualTo("Valeur :  fin");
+            String text = documentText(document);
+            assertThat(text).doesNotContain("{{").doesNotContain("}}");
+            assertThat(text.trim()).isEqualTo("Valeur :  fin");
         }
     }
 

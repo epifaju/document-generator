@@ -762,12 +762,16 @@ administrative.
 |---|---|---|---|---|---|
 | `postgres` | `postgres:16-alpine` | **aucune publication** (loopback `127.0.0.1:5432` commentée, debug uniquement) | `pgdata:/var/lib/postgresql/data` | `pg_isready -U $POSTGRES_USER -d $POSTGRES_DB` (5 s, 10 retries, start 10 s) | défaut |
 | `backend` | `build: {context: .., dockerfile: backend/Dockerfile}` | `127.0.0.1:8080:8080` | `storage-data:/data/storage` + `../templates:/app/templates:ro` | `curl -fsS http://localhost:8080/actuator/health` (10 s, 10 retries, start 40 s) | défaut |
-| `n8n` | `n8nio/n8n:${N8N_VERSION:-latest}` | `5678:5678` | `n8n-data:/home/node/.n8n` + `../prompts:/prompts:ro` + `../n8n/workflows:/workflows:ro` | aucune (`depends_on: service_started`) | défaut |
-| `ollama` | `ollama/ollama` | `11434:11434` | `ollama-data:/root/.ollama` | aucune | **`ollama`** (optionnel) |
+| `n8n` | `n8nio/n8n:${N8N_VERSION:-latest}` | `127.0.0.1:5678:5678` (H.2, S-2 : loopback) | `n8n-data:/home/node/.n8n` + `../prompts:/prompts:ro` + `../n8n/workflows:/workflows:ro` | aucune (`depends_on: service_started`) | défaut |
+| `ollama` | `ollama/ollama` | `127.0.0.1:11434:11434` (H.2, S-2 : loopback) | `ollama-data:/root/.ollama` | aucune | **`ollama`** (optionnel) |
 
 Détails d'assemblage :
 
 - réseau bridge unique `adgendoc-internal` ; aucun service en `privileged` ;
+  **toutes les publications hôte sont épinglées à `127.0.0.1`** (backend 8080,
+  n8n 5678, ollama 11434 — H.2 S-2) ; PostgreSQL reste non publié ; la
+  communication conteneur→conteneur (backend ↔ n8n ↔ ollama ↔ postgres)
+  traverse le réseau interne et ne dépend d'aucune publication hôte ;
 - `backend` : `depends_on: postgres: condition: service_healthy` ;
   env `SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}`,
   `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`,
@@ -776,7 +780,10 @@ Détails d'assemblage :
   `SERVER_BIND_ADDRESS="0.0.0.0"` (littéral, **intérieur** conteneur — le bind
   par défaut côté hôte est `127.0.0.1`, cf. §12) ;
 - `n8n` : `depends_on: backend` ; env `BACKEND_BASE_URL=http://backend:8080`,
-  `OLLAMA_BASE_URL=http://ollama:11434`, `OLLAMA_MODEL`, `N8N_ENCRYPTION_KEY`,
+  `OLLAMA_BASE_URL=http://ollama:11434`, `OLLAMA_MODEL`,
+  `N8N_ENCRYPTION_KEY` **exigée sans aucun défaut**
+  (`${N8N_ENCRYPTION_KEY:?…}` — H.2 S-3 : compose échoue explicitement si la
+  variable est absente ou vide, jamais de clé faible héritée),
   `NODE_FUNCTION_ALLOW_BUILTIN=fs` ;
 - `ollama` : profil optionnel — le pipeline fonctionne sans lui en
   mode test (fixtures JSON) ;
@@ -805,8 +812,11 @@ N8N_VERSION=latest
 N8N_BASIC_AUTH_ACTIVE=true
 N8N_BASIC_AUTH_USER=admin
 N8N_BASIC_AUTH_PASSWORD=CHANGE_ME
-# openssl rand -hex 32
-N8N_ENCRYPTION_KEY=CHANGE_ME_openssl_rand_hex_32
+# OBLIGATOIRE — AUCUN défaut committé (Phase H.2 S-3) : la valeur doit être
+# générée par opérateur (openssl rand -hex 32) puis stockée UNIQUEMENT dans
+# docker/.env (gitignoré). Une valeur vide ou absente fait échouer
+# `docker compose config` / `up` (fail-fast, jamais de clé faible héritée).
+N8N_ENCRYPTION_KEY=
 
 # --- URLs / chemins (variables du workflow n8n, §7) ---
 BACKEND_BASE_URL=http://backend:8080
@@ -820,6 +830,12 @@ Le mot de passe du backend n'y figure pas : `docker-compose.yml` l'injecte via
 `SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?…}`. Hors Docker, définir
 `SPRING_DATASOURCE_PASSWORD` dans l'environnement — le backend **refuse de
 démarrer** sans secret (`DatasourceSecretGuard`, §11.5).
+
+`N8N_ENCRYPTION_KEY` suit la même règle (H.2, S-3) : le service n8n
+l'exige via `${N8N_ENCRYPTION_KEY:?…}`, **sans valeur par défaut**. Copier ce
+fichier sans renseigner la ligne `N8N_ENCRYPTION_KEY=` fait donc échouer
+`docker compose config` / `up` (preuve : gate de configuration §11.5) —
+jamais de clé faible héritée.
 
 Commandes locales :
 
@@ -917,7 +933,7 @@ gate.**
 
 | # | Gate | Commande | Prérequis | Critère PASS |
 |---|---|---|---|---|
-| 1 | Hors-ligne | `mvn -o -f backend/pom.xml clean test` | JDK 17, **aucun Docker**, **serveur arrêté** (sinon `clean` ne peut pas supprimer le JAR verrouillé) | `Tests run: 269, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS` |
+| 1 | Hors-ligne | `mvn -o -f backend/pom.xml clean test` | JDK 17, **aucun Docker**, **serveur arrêté** (sinon `clean` ne peut pas supprimer le JAR verrouillé) | `Tests run: 277, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS` |
 | 2 | PostgreSQL réel | `mvn -o -f backend/pom.xml test -Dtest=PostgresPersistenceIT` | conteneur PostgreSQL joignable + `SPRING_DATASOURCE_URL` / `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` + `MIGRATIONS_DIR` + `TEMPLATE_DIR` | `Tests run: 13, … 0` + `BUILD SUCCESS` (Flyway V1/V2 puis `ddl-auto: validate`) |
 | 3 | HTTP E2E réel | `powershell -ExecutionPolicy Bypass -File tests/e2e/run_http_e2e.ps1` | serveur Spring Boot **déjà démarré** et sain + PostgreSQL + `E2E_JDBC_PASSWORD` + copie de template hors dépôt + stockage de test | `GATE HTTP E2E: SUCCES`, code de sortie **0**, `Tests run: 11, Failures: 0, Errors: 0` et `Skipped: 0` **ou** `Skipped: 1` (test périmétrique sauté par `Assumption` si l'hôte n'a aucune IPv4 non-loopback) |
 
@@ -969,8 +985,23 @@ située dans le dépôt.
 de test, stockage de test vidé, ports de test fermés (5460 / 18099), aucun
 Spring Boot résiduel, aucun secret commité (`git status` propre).
 
-**Totaux attendus :** 269 (gate 1) + 13 (gate 2) + 11 (gate 3) = **293 tests,
+**Totaux attendus :** 277 (gate 1) + 13 (gate 2) + 11 (gate 3) = **301 tests,
 0 échec**.
+
+**Vérification Compose (Phase H.2, hors gates Maven) :** la configuration
+`docker/docker-compose.yml` est validée sans démarrer aucun service :
+
+```
+# variables de test SANS valeur secrète, fichier hors dépôt (jamais commité)
+docker compose -f docker/docker-compose.yml --profile ollama --env-file <env-de-test> config   # exit 0
+# sans N8N_ENCRYPTION_KEY : exit 1 + « required variable N8N_ENCRYPTION_KEY is missing »
+docker compose -f docker/docker-compose.yml --env-file <env-sans-cle> config                    # exit 1
+```
+
+Critères PASS : `exit 0` quand toutes les variables sont fournies ; `exit 1`
+et message explicite en leur absence ; rendu `config` avec
+`host_ip: 127.0.0.1` pour 8080, 5678 et 11434, et **aucun** bloc `ports`
+pour `postgres`.
 
 **Mode d'échec du secret :** un datasource PostgreSQL sans secret fait échouer le
 démarrage par un `IllegalStateException` explicite, levé **avant** le rafraîchissement
@@ -984,13 +1015,14 @@ erreurs de requête).
 
 | Mesure | Détail implémentable |
 |---|---|
-| Aucun secret commité | credentials uniquement en variables d'env / `docker/.env` (gitignoré) ; `docker/.env.example` sans valeurs réelles ; export n8n sans `"credentials"` (AGENTS.md §11) ; **`spring.datasource.password` sans défaut committé** + `DatasourceSecretGuard` (Phase H.1) qui refuse explicitement le démarrage d'un datasource PostgreSQL sans `SPRING_DATASOURCE_PASSWORD` |
+| Aucun secret commité | credentials uniquement en variables d'env / `docker/.env` (gitignoré) ; `docker/.env.example` sans valeurs réelles ; export n8n sans `"credentials"` (AGENTS.md §11) ; **`spring.datasource.password` sans défaut committé** + `DatasourceSecretGuard` (Phase H.1) qui refuse explicitement le démarrage d'un datasource PostgreSQL sans `SPRING_DATASOURCE_PASSWORD` ; **`N8N_ENCRYPTION_KEY` sans défaut committé** (Phase H.2, S-3) : `${N8N_ENCRYPTION_KEY:?…}` fait échouer compose si la variable est absente ou vide |
 | Pas de stack trace client | `GlobalExceptionHandler` renvoie toujours `ErrorResponse` structuré (code, message FR, `correlationId`) ; logs serveur uniquement ; `server.error.include-stacktrace=never`, `include-message=never` |
+| Journalisation des erreurs base sûre (H.2, S-1) | `handleDatabase`, `handleUnexpected` et `handleGenerationFailure` (ce dernier reçoit les `DataAccessException` enveloppées par `asGenerationFailure`) ne journalisent **jamais** le message brut d'une exception (SQL, valeurs liées, lignes, PII, chemins, credentials JDBC) : au niveau ERROR, uniquement résumé fixe + `errorCode` + `exceptionClass` + `SQLState` (forme validée) + `correlationId` ; stack trace **uniquement en DEBUG** (racine `INFO` packagée ⇒ coupée en production) ; écho SQL brut d'Hibernate coupé (`org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF`) ; preuve : `DatabaseErrorLogSanitizationTest` (exception hostile à marqueurs PII/secret sur les trois handlers) |
 | Validation systématique | Bean Validation sur **tous** les DTO d'entrée + `ValidationService` déterministe ; aucune route sans validation d'entrée |
 | Taille max payload | `PayloadSizeLimitFilter` : `app.document.max-payload-bytes` (défaut **65536** octets) → `413` avant désérialisation |
 | Contrôle d'extension fichier | lecture/écriture limitées à `.docx` ; noms de fichiers **uniquement** générés côté serveur (UUID) ; canonicalisation de chemin contre path traversal |
 | Minimisation PII | `audit_log.details` sans données personnelles (uniquement `status`, `errorCode`, `nbMissingFields`, `durationMs`, `documentType`) ; pas de `data` complet dans les logs applicatifs (AGENTS.md §13, OQ-API-4 en escalade) |
-| Réseau Docker | réseau bridge dédié `adgendoc-internal` ; PostgreSQL **non publié par défaut** (publication loopback `127.0.0.1:5432` réservée au debug, commentée) ; aucune auth HTTP en it.1 → **périmètre restreint contrôlé** : `server.address` = `${SERVER_BIND_ADDRESS:127.0.0.1}`, publication Docker `127.0.0.1:8080:8080` (jamais `0.0.0.0` côté hôte), `SERVER_BIND_ADDRESS: "0.0.0.0"` **littéral dans le conteneur** (jamais hérité de l'hôte) pour n8n/ollama |
+| Réseau Docker | réseau bridge dédié `adgendoc-internal` ; PostgreSQL **non publié par défaut** (publication loopback `127.0.0.1:5432` réservée au debug, commentée) ; aucune auth HTTP en it.1 → **périmètre restreint contrôlé** : `server.address` = `${SERVER_BIND_ADDRESS:127.0.0.1}`, publications Docker épinglées au loopback côté hôte — `127.0.0.1:8080:8080`, **`127.0.0.1:5678:5678` (n8n)**, **`127.0.0.1:11434:11434` (ollama)** (H.2, S-2 ; jamais `0.0.0.0` côté hôte), `SERVER_BIND_ADDRESS: "0.0.0.0"` **littéral dans le conteneur** (jamais hérité de l'hôte) pour n8n/ollama ; conteneur→conteneur via le réseau interne uniquement |
 | Accès documents | E6 ouvert en it.1 (**risque assumé**, contrat §1.3) mais **borné au loopback** (test `service_answers_only_on_loopback`, gate 3) ; fermeture par authentification obligatoire avant prod → escalade security (R-10) |
 | JWT | **reporté it.2** : `Authorization: Bearer` exigé sur tous les endpoints sauf E7 ; chemins déjà conçus sans contexte d'identité implicite |
 | Intégrité template | checksum SHA-256 vérifié à chaque génération ; mismatch ⇒ `TEMPLATE_NOT_FOUND`, aucun document produit |
@@ -1148,6 +1180,28 @@ Ordre imposé : chaque phase dépend des précédentes.
     (`META-INF/spring.factories`), `spring.datasource.password` sans défaut
 88. (H.1) `RuntimeSecurityContractTest`, `DatasourceSecretGuardTest`,
     `RequestLoggingSanitizationTest` + documentation des trois gates (§11.5)
+
+**Phase H.2 — durcissement sécurité avant orchestration** (`security` avec
+`backend-developer`)
+
+> **Périmètre :** uniquement S-1, S-2, S-3. Aucun JWT, aucune règle métier,
+> aucun changement de génération DOCX, migrations V1/V2 inchangées, PDF et
+> workflows n8n hors périmètre, OQ-1 inchangé (`REQUIRES_BUSINESS_VALIDATION`).
+
+89. (H.2, S-1) `backend/src/test/java/com/adgendoc/api/DatabaseErrorLogSanitizationTest.java`
+    — exception base **hostile** (marqueurs PII/secret/SQL/JDBC) sur
+    `handleDatabase`, `handleUnexpected` **et** `handleGenerationFailure`
+    (canal revu : `asGenerationFailure` enveloppe les `DataAccessException`) :
+    aucun marqueur dans les logs INFO/ERROR, métadonnées sûres présentes
+    (`errorCode`, `exceptionClass`, `SQLState`, `correlationId`), stack trace
+    DEBUG uniquement ; `GlobalExceptionHandler.logTechnicalFailureSafely` ;
+    écho SQL brut d'Hibernate désactivé (§12)
+90. (H.2, S-2) publications `n8n` `127.0.0.1:5678:5678` et
+    `ollama` `127.0.0.1:11434:11434` (PostgreSQL toujours non publié) +
+    contrats dans `RuntimeSecurityContractTest`
+91. (H.2, S-3) `N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?…}` sans défaut,
+    `docker/.env.example` sans valeur de clé ; preuves `docker compose config`
+    (exit 0 avec variable, exit 1 sans elle, §11.5)
 
 ---
 
