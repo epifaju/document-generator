@@ -208,6 +208,20 @@ Les **bornes chiffrées** (timeouts, tentatives) sont normatives dans le
 contrat §4. Ce tableau décrit le **routage** ; « 0 backend » signifie
 qu'aucune requête n'est émise vers E1–E6 avant l'échec.
 
+**Règle de sémantique HTTP (décision humaine R1, prevail sur toute ligne
+`503` de ce tableau)** :
+
+- **Backend injoignable** (connexion refusée, échec DNS/réseau, timeout
+  *sans* réponse HTTP exploitable) → `503 BACKEND_UNAVAILABLE`.
+- **Backend joignable qui renvoie explicitement un `5xx`** → `500
+  INTERNAL_ERROR`.
+
+`requirements/N8N_CONTRACTS.md` §3.2 (règle par défaut, lignes 188-194) et
+§3.4 (`BACKEND_UNAVAILABLE` = « backend injoignable / échecs bornés sur
+E1–E8 ») prévalent sur les lignes de ce tableau qui indiquaient `503` pour un
+`5xx` **reçu** : ces lignes sont corrigées ci-dessous. `503` ne subsiste que
+pour l'injoignabilité.
+
 | # | Étape | Échec observé | Traitement n8n | Issue | Notes / garanties |
 |---|---|---|---|---|---|
 | 1 | Ingress | corps invalide, clé inconnue, `message` > 4000, `requestId` malformé | rejet immédiat | `400 INVALID_REQUEST` | 0 backend |
@@ -215,11 +229,11 @@ qu'aucune requête n'est émise vers E1–E6 avant l'échec.
 | 3 | Parse | sortie LLM non JSON strict | arrêt | `502 AI_EXTRACTION_ERROR` | aucun « parse au mieux » |
 | 4 | E8 | `400` + `ERR_DOCUMENT_TYPE_NON_SUPPORTE` | message type | `200 UNSUPPORTED_DOCUMENT_TYPE` | 0 création |
 | 5 | E8 | `400` dont `errors[]` **sans** `ERR_DOCUMENT_TYPE_NON_SUPPORTE` | arrêt | `502 EXTRACTION_SCHEMA_INVALID` | 0 création, `errors[]` loggé (sans PII) |
-| 6 | E8 | `5xx`/timeout | retry borné (2) | `503 BACKEND_UNAVAILABLE` | pure → sûre |
+| 6 | E8 | `5xx` reçu / timeout | retry borné (2) | `5xx` reçu → `500 INTERNAL_ERROR` ; timeout → `503 BACKEND_UNAVAILABLE` | pure → sûre |
 | 7 | E1 | `422` | question | `200 MISSING_INFORMATION` | persistée (OQ-3) → boucle §5 |
 | 8 | E1 | `400` + `requestId` | rejet métier | `200 REJECTED` | persistée T4 (audit) |
 | 9 | E1 | `400` sans `requestId` | rejet enveloppe | `400 INVALID_REQUEST` | non persistée |
-| 10 | E1 | `5xx` **reçu** | retry (2) puis arrêt | `503 BACKEND_UNAVAILABLE` | tx annulée → retry sûr **sauf échec post-commit (audit)** → doublon tracé `F-I-1` |
+| 10 | E1 | `5xx` **reçu** | retry (2) puis arrêt | `500 INTERNAL_ERROR` (R1) | tx annulée → retry sûr **sauf échec post-commit (audit)** → doublon tracé `F-I-1` |
 | 11 | E1 | timeout / connexion perdue | **aucun retry** | `503` + `correlationId` | ambiguïté → réconciliation audit (`F-I-1`) |
 | 12 | E3 | `200` | route par statut (§3.3/§5) | `GENERATED`/`MISSING`/`REJECTED` | jamais de DRAFT (T-…) |
 | 13 | E3 | `400` structurel (clé inconnue/réservée) | **bug n8n** (il n'envoie que des clés du schéma) | `400 INVALID_REQUEST` + log ERROR | 0 mutation (contrat F-03) |
@@ -229,15 +243,15 @@ qu'aucune requête n'est émise vers E1–E6 avant l'échec.
 | 17 | E4 | `200` | E5 | suite | garde T11 |
 | 18 | E4 | `422` / `400` | question / rejet | `200 MISSING_INFORMATION` / `200 REJECTED` | T6b / T4–T6–T12b |
 | 19 | E4 | `409 INVALID_STATUS` | E2 → route | selon statut | ex. `GENERATED` → succès |
-| 20 | E4 | `5xx`/timeout | retry borné (3, idempotent) | `503` | T11 sûr |
+| 20 | E4 | `5xx` reçu / timeout | retry borné (3, idempotent) | `5xx` reçu → `500 INTERNAL_ERROR` ; timeout → `503 BACKEND_UNAVAILABLE` | T11 sûr |
 | 21 | E5 | `201` | E6 vérif. → fin | `200 GENERATED` | chaîne §4 |
-| 22 | E5 | `500 TEMPLATE_NOT_FOUND`/`DOCUMENT_GENERATION_ERROR` (→ `FAILED`, T9) | **1** récupération : E4 (T12) → E5 | `200 GENERATED` si réussi, sinon `200 GENERATION_FAILED` + `cause` | reprise conforme §1.5 architecture |
+| 22 | E5 | `500 TEMPLATE_NOT_FOUND`/`DOCUMENT_GENERATION_ERROR` (→ `FAILED`, T9) | **1** récupération : E4 (T12) → **1** nouvel appel E5 (2 tentatives max, R2) | `200 GENERATED` si réussi, sinon `200 GENERATION_FAILED` + `cause` | reprise conforme §1.5 architecture, jamais un 3ᵉ appel E5 |
 | 23 | E5 | `409 INVALID_STATUS` | E2 : `GENERATED` → E6 → succès ; sinon route | variable | double livraison résolue sans double document |
-| 24 | E5 | timeout | E2 poll borné (3×5 s, contrat §4) → route comme 23 ; toujours `VALIDATED` → 1 retry E5 | variable | jamais de retry E5 « à l'aveugle » ; fenêtre TOCTOU possible (2 générations) → outcome limité à **1** `documentId` (plus récent, `F-I-9`) |
+| 24 | E5 | timeout | E2 poll borné (3×5 s, contrat §4) → route comme 23 ; toujours `VALIDATED` → **1** reprise E4 (T12) → **1** retry E5 (max 2 tentatives, R2) ; sinon `200 GENERATION_FAILED` | variable | jamais un 3ᵉ appel E5 ; fenêtre TOCTOU possible (2 générations) → outcome limité à **1** `documentId` (plus récent, `F-I-9`) |
 | 25 | E5 | `404` | `INTERNAL_ERROR` | `500` | bug d'orchestration (requestId déjà validé) |
-| 26 | E6 | `5xx`/timeout post-`201` | retry borné (3) | `503` + `requestId` | ne **jamais** déclarer `GENERATED` sans vérif. |
+| 26 | E6 | `5xx` reçu / timeout post-`201` | retry borné (3) | `5xx` reçu → `500 INTERNAL_ERROR` ; timeout → `503 BACKEND_UNAVAILABLE` + `requestId` | ne **jamais** déclarer `GENERATED` sans vérif. |
 | 27 | E6 | `404` post-`201` | `INTERNAL_ERROR` + log | `500` | incohérence serveur, pas de faux succès |
-| 28 | Toute E1–E6 | connexion refusée (backend down) | retries bornés (§4) | `503 BACKEND_UNAVAILABLE` | sans stack trace, avec `correlationId` |
+| 28 | Toute E1–E6 | connexion refusée (backend down) | retries bornés (§4) | `503 BACKEND_UNAVAILABLE` | injoignabilité seule — un `5xx` **reçu** reste `500 INTERNAL_ERROR` (R1) ; sans stack trace, avec `correlationId` |
 | 29 | Boucle | `MAX_CLARIFICATION_ROUNDS` atteint | arrêt dialogue | `200 CLARIFICATION_LIMIT_REACHED` | plus de PII échangée |
 | 30 | Exécution | `EXECUTIONS_TIMEOUT` (900 s, contrat §4) | kill borné | erreur **native n8n** sans enveloppe `outcome` (contrat §3.1) | aucune exécution suspendue (H.3) |
 | 31 | Toute E1–E6 | statut backend **non listé** ci-dessus | (request-scoped) E2 d'abord ; sinon résolution directe → arrêt | `500 INTERNAL_ERROR` + log du statut reçu | jamais de chute silencieuse ; gate I-D |
