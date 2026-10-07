@@ -1,0 +1,4 @@
+Permissions 0644 for n8n settings file /home/node/.n8n/config are too wide. This is ignored for now, but in the future n8n will attempt to change the permissions automatically. To automatically enforce correct permissions now set N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true (recommended), or turn this check off set N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false.
+User settings loaded from: /home/node/.n8n/config
+You can find up to date information about the CLI here:
+https://docs.n8n.io/hosting/cli-commands/
