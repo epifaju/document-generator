@@ -89,7 +89,8 @@ $script:RequiredNodes = @(
 # value assigned to an `outcome` field.
 $script:InternalMarkers = @(
     'INITIALIZED', 'PROMPT_LOADED', 'EXTRACTION_PARSED', 'CONTEXT_READY',
-    'CLARIFICATION_REQUIRED', 'PROCEED'
+    'CLARIFICATION_REQUIRED', 'PROCEED',
+    'GENERATED_REPLAY', 'E4_CONTINUATION'
 )
 # Non-outcome uppercase literals legitimately present in orchestration code
 # (backend business codes, causes, technical codes, node-name registries).
@@ -299,16 +300,22 @@ Assert-Deadline
 # fail one either. Nodes added by the human rulings R2 (bounded E5 recovery:
 # PrepareE5Recovery, E4ReconcileValidate, AdoptE4Recovery, E5RetryGenerate) and
 # R6 (third output of AdoptE2Reconcile) are part of the reviewed design, so the
-# expected band moves with them: 28 -> 32.
+# expected band moves with them: 28 -> 32. Then the C5 runtime fix (the n8n 1.94.1
+# Code node typeVersion 2 has ONE output; the nested [[success],[fault]] return
+# shape made item 0 an array and crashed with "a 'json' property isn't an object")
+# flattened the 7 multi-output Code nodes to a single output and added 7 routing
+# nodes (IFPromptLoaded, IFParseDecoded, IFContextReady, IFBoundNotReached,
+# SwitchE2Route, IFRecoveryAllowed, IFRecoveryValidated), so the expected band
+# moves again: 32 -> 39.
 $count = $nodes.Count
 if ($count -lt 2 -or $count -gt 40) {
     Write-Result 'A04' 'FAIL' ("actual node count " + $count + " is outside the hard envelope 2..40")
 }
-elseif ($count -lt 14 -or $count -gt 32) {
-    Write-Result 'A04' 'PASS' ("actual node count " + $count + " (inside 2..40 but outside the expected 14..32 envelope)")
+elseif ($count -lt 14 -or $count -gt 39) {
+    Write-Result 'A04' 'PASS' ("actual node count " + $count + " (inside 2..40 but outside the expected 14..39 envelope)")
 }
 else {
-    Write-Result 'A04' 'PASS' ("actual node count " + $count + " inside the expected 14..32 envelope")
+    Write-Result 'A04' 'PASS' ("actual node count " + $count + " inside the expected 14..39 envelope")
 }
 Assert-Deadline
 
@@ -1220,13 +1227,13 @@ foreach ($row in $retryTable) {
         # so a blanket retry here would double it: the flag is now decidable.
         if ($hasRetry) { $a29.Add(($row.Node + ': retryOnFail must NOT be true: the R2 recovery chain already delivers the 2 attempts of the 4 table (initial + E5RetryGenerate), so a blanket retry would allow 3 and 4')) }
         if ($hasTries -and ([string]$n.maxTries) -ne '1') {
-            $a29.Add(($row.Node + ': maxTries must be absent or 1; the 4 count of 2 is delivered by PrepareE5Recovery -> E4ReconcileValidate -> AdoptE4Recovery -> E5RetryGenerate (R2); found ' + [string]$n.maxTries))
+            $a29.Add(($row.Node + ': maxTries must be absent or 1; the 4 count of 2 is delivered by PrepareE5Recovery -> IFRecoveryAllowed -> E4ReconcileValidate -> AdoptE4Recovery -> IFRecoveryValidated -> E5RetryGenerate (R2); found ' + [string]$n.maxTries))
         }
         if ($note -eq '') {
             $a29.Add(($row.Node + ': the node MUST carry notes documenting the bounded R2 recovery (why n8n cannot retry the stage itself); the notes field is empty (M1)'))
         }
-        elseif ($note -notmatch 'PrepareE5Recovery' -or $note -notmatch 'E5RetryGenerate') {
-            $a29.Add(($row.Node + ': the notes must name the bounded recovery chain (PrepareE5Recovery then E5RetryGenerate), otherwise the 4 count of 2 is unverifiable (M1)'))
+        elseif ($note -notmatch 'PrepareE5Recovery' -or $note -notmatch 'E5RetryGenerate' -or $note -notmatch 'IFRecoveryAllowed' -or $note -notmatch 'IFRecoveryValidated') {
+            $a29.Add(($row.Node + ': the notes must name the bounded recovery chain INCLUDING its router hops (PrepareE5Recovery -> IFRecoveryAllowed -> E4ReconcileValidate -> AdoptE4Recovery -> IFRecoveryValidated -> E5RetryGenerate), otherwise the 4 count of 2 is unverifiable (M1, correction cycle 2 S2)'))
         }
     }
     else {
@@ -1338,23 +1345,46 @@ else {
         $a29.Add('PrepareE5Recovery must require BOTH a received 5xx and a generation cause: 4 authorizes the recovery on a RECEIVED 5xx carrying TEMPLATE_NOT_FOUND or DOCUMENT_GENERATION_ERROR, never on a timeout')
     }
 }
+# The recovery / resume chain reaches E4ReconcileValidate and E5RetryGenerate through
+# the single-output routers introduced when the multi-output Code nodes were flattened
+# (C5 runtime fix): PrepareE5Recovery -> IFRecoveryAllowed -> E4ReconcileValidate (R2
+# recovery), AdoptE2Reconcile -> SwitchE2Route -> E4ReconcileValidate (R6 resume), and
+# AdoptE4Recovery -> IFRecoveryValidated -> E5RetryGenerate (the only E5 attempt after
+# the first). Each hop is asserted PER ROUTER (predecessor of the exact expected router,
+# not a union of all three): a union would also pass if a node fed the WRONG router.
+$chainHops = @(
+    @{ From = 'PrepareE5Recovery'; To = 'IFRecoveryAllowed'; Why = 'the R2 recovery guard hop through the router' },
+    @{ From = 'AdoptE2Reconcile'; To = 'SwitchE2Route'; Why = 'the R6 resume guard hop through the router' },
+    @{ From = 'AdoptE4Recovery'; To = 'IFRecoveryValidated'; Why = 'the only E5 attempt allowed after the first, gated by the router' }
+)
+foreach ($hop in $chainHops) {
+    # Correction cycle 2 (B2): EXACT predecessor set — exactly ONE edge, from $hop.From.
+    # A membership test also passed when a second, unexpected edge reached the router.
+    $hopPreds = @(Get-SourceRefsOf -Target $hop.To)
+    if ($hopPreds.Count -ne 1 -or $hopPreds[0] -cne $hop.From) {
+        $a29.Add(($hop.From + ' must feed its router ' + $hop.To + ' through EXACTLY ONE edge (' + $hop.Why + '); direct predecessor edges of ' + $hop.To + ': ' + $hopPreds.Count.ToString() + ' from [' + ($hopPreds -join ', ') + '] (exact-set exclusivity)'))
+    }
+}
 $prepPreds = @(Get-SourceRefsOf -Target 'E4ReconcileValidate')
-foreach ($expectedPred in @('PrepareE5Recovery', 'AdoptE2Reconcile')) {
-    if ($prepPreds -notcontains $expectedPred) { $a29.Add('E4ReconcileValidate must be reachable from ' + $expectedPred + ' (the R2 recovery guard and the R6 resume guard); predecessors: [' + ($prepPreds -join ', ') + ']') }
+$expectedPrep = @('IFRecoveryAllowed', 'SwitchE2Route')
+$prepMissing = @($expectedPrep | Where-Object { $prepPreds -cnotcontains $_ })
+$prepExtra = @($prepPreds | Where-Object { $expectedPrep -cnotcontains $_ })
+if ($prepPreds.Count -ne 2 -or $prepMissing.Count -gt 0 -or $prepExtra.Count -gt 0) {
+    $a29.Add('E4ReconcileValidate must be fed by EXACTLY the two router edges (IFRecoveryAllowed the R2 recovery router, SwitchE2Route the R6 resume router) and by nothing else; predecessor edges: ' + $prepPreds.Count.ToString() + ' from [' + ($prepPreds -join ', ') + '] (exact-set exclusivity, correction cycle 2)')
 }
 $retryPreds = @(Get-SourceRefsOf -Target 'E5RetryGenerate')
-if ($retryPreds -notcontains 'AdoptE4Recovery') {
-    $a29.Add('E5RetryGenerate must be fed by AdoptE4Recovery (the only E5 attempt allowed after the first); predecessors: [' + ($retryPreds -join ', ') + ']')
+if ($retryPreds.Count -ne 1 -or $retryPreds[0] -cne 'IFRecoveryValidated') {
+    $a29.Add('E5RetryGenerate must be fed by EXACTLY ONE edge from IFRecoveryValidated (the only E5 attempt allowed after the first, gated by AdoptE4Recovery); predecessor edges: ' + $retryPreds.Count.ToString() + ' from [' + ($retryPreds -join ', ') + '] (exact-set exclusivity, correction cycle 2)')
 }
 $e5Preds = @(Get-SourceRefsOf -Target 'E5GenerateDocument')
-if ($e5Preds -notcontains 'IFRequestComplete') {
-    $a29.Add('E5GenerateDocument must be fed by IFRequestComplete as before; predecessors: [' + ($e5Preds -join ', ') + ']')
+if ($e5Preds.Count -ne 1 -or $e5Preds[0] -cne 'IFRequestComplete') {
+    $a29.Add('E5GenerateDocument must be fed by EXACTLY ONE edge from IFRequestComplete as before; predecessor edges: ' + $e5Preds.Count.ToString() + ' from [' + ($e5Preds -join ', ') + '] (exact-set exclusivity, correction cycle 2)')
 }
 if ($a29.Count -gt 0) {
     Write-Result 'A29' 'FAIL' (($a29 | Sort-Object -Unique) -join '; ')
 }
 else {
-    Write-Result 'A29' 'PASS' ('hard dimension: all ' + $seen29.Count.ToString() + ' HTTP stages match the 4 table on timeout; the ' + (@($retryTable | Where-Object { $_.Retry -eq 'hard' }).Count).ToString() + ' stages whose 4 retry prescription is a blanket retry match on retryOnFail=true + maxTries; the R2 bound is structural: exactly two generate nodes (' + ($generateNodes -join ', ') + '), neither with retryOnFail=true, the retry error terminating at FinalizeResponse, e5Attempted initialised by MergeContext, incremented by AdoptE4Recovery and compared to MAX_E5_ATTEMPTS=2 by PrepareE5Recovery; the 1 stage whose 4 retry prescription is still non-expressible (E1CreateRequest, deferred to I.1-B) accepts either flag value and only requires the M1 notes')
+    Write-Result 'A29' 'PASS' ('hard dimension: all ' + $seen29.Count.ToString() + ' HTTP stages match the 4 table on timeout; the ' + (@($retryTable | Where-Object { $_.Retry -eq 'hard' }).Count).ToString() + ' stages whose 4 retry prescription is a blanket retry match on retryOnFail=true + maxTries; the R2 bound is structural: exactly two generate nodes (' + ($generateNodes -join ', ') + '), neither with retryOnFail=true, the retry error terminating at FinalizeResponse, e5Attempted initialised by MergeContext, incremented by AdoptE4Recovery and compared to MAX_E5_ATTEMPTS=2 by PrepareE5Recovery, and the recovery/resume chain is wired with EXACT predecessor sets (each of the 3 router hops a single edge, E4ReconcileValidate exactly the two router edges and nothing else, E5RetryGenerate exactly one edge from IFRecoveryValidated, E5GenerateDocument exactly one edge from IFRequestComplete); the 1 stage whose 4 retry prescription is still non-expressible (E1CreateRequest, deferred to I.1-B) accepts either flag value and only requires the M1 notes naming the chain with its router hops')
 }
 if ($script:DeferredDimensions.Count -gt 0) {
     $script:DEFERRED++
@@ -1484,8 +1514,9 @@ Assert-Deadline
 #   * MISSING_INFORMATION is the ONLY status allowed to reach E3PatchRequest (R6):
 #     no second PATCH branch may exist, and the rule that owns E3PatchRequest must
 #     not mention DRAFT, VALIDATED or FAILED;
-#   * VALIDATED / DRAFT / FAILED are routed to the E4 guard (AdoptE2Reconcile
-#     output 1 -> E4ReconcileValidate -> E5RetryGenerate): an E4-then-E5 resume,
+#   * VALIDATED / DRAFT / FAILED are routed to the E4 guard (AdoptE2Reconcile's
+#     single output routed by SwitchE2Route output 1 -> E4ReconcileValidate
+#     -> E5RetryGenerate): an E4-then-E5 resume,
 #     never a mutation of the request (3.3, R6);
 #   * that continuation is open ONLY to the resume read: AdoptE2Reconcile must
 #     test E2ReconcileRequest before opening it, so a reconciliation of a 409 /
@@ -1499,8 +1530,9 @@ Assert-Deadline
 #   * the R2 chain is wired exactly once and terminates: a failure of a mutating
 #     stage is routed to the read-only E2 reconciliation node, EXCEPT a received
 #     5xx carrying a generation cause, which goes to the bounded recovery guard
-#     (RouteMutatingFailure output 0 -> PrepareE5Recovery -> E4ReconcileValidate
-#     -> AdoptE4Recovery -> E5RetryGenerate -> FinalizeResponse on error).
+#     (RouteMutatingFailure output 0 -> PrepareE5Recovery -> IFRecoveryAllowed ->
+#     E4ReconcileValidate -> AdoptE4Recovery -> IFRecoveryValidated ->
+#     E5RetryGenerate -> FinalizeResponse on error).
 $a35 = New-Object System.Collections.Generic.List[string]
 
 function Get-TargetsOf {
@@ -1512,15 +1544,23 @@ function Get-TargetsOf {
     return @($result)
 }
 
-function Get-NodeReachSet {
+# Full reachability over ALL output indexes. The flattened single-output Code nodes
+# feed multi-output routers, so the former "downstream of node X" exclusions must
+# traverse every branch of those routers to keep their strength (T14).
+# (A single-index predecessor of this helper, Get-NodeReachSet, was removed by
+# correction cycle 1: it had no call site since the C5 flattening introduced
+# Get-NodeReachSetAll.)
+function Get-NodeReachSetAll {
     param([string]$Start)
     $seen = New-Object System.Collections.Generic.HashSet[string]
     $queue = New-Object 'System.Collections.Generic.Queue[string]'
     $queue.Enqueue($Start)
     while ($queue.Count -gt 0) {
         $cur = [string]$queue.Dequeue()
-        foreach ($nxt in Get-TargetsOf -Source $cur -Index 0) {
-            if ($seen.Add($nxt)) { $queue.Enqueue($nxt) }
+        foreach ($idx in 0, 1, 2, 3, 4, 5) {
+            foreach ($nxt in Get-TargetsOf -Source $cur -Index $idx) {
+                if ($seen.Add($nxt)) { $queue.Enqueue($nxt) }
+            }
         }
     }
     return $seen
@@ -1545,13 +1585,106 @@ function Get-RuleConditions {
     return $result
 }
 
-function Get-SourceRefsNamed {
-    param([string]$Target)
-    $result = New-Object System.Collections.Generic.List[string]
-    foreach ($r in $script:AllRefs) {
-        if ($r.Target -eq $Target) { $result.Add([string]$r.Source) }
+# Correction cycle 2 helpers.
+#
+# Get-IfConditionObjects: the CONDITION OBJECTS (leftValue + operator) of an IF node
+# (parameters.conditions.conditions, typeVersion 2.2), so their shape can be pinned.
+#
+# Get-ConditionsShapeErrors (S1): FULL pin of a router condition - exact count, exact
+# leftValue text (operand AND operator, compared CASE-SENSITIVELY) and the boolean/true
+# operator the IF / switch schemas evaluate. The cycle-1 substring test passed on any
+# mention of the marker, including inside another operand or inside a comment.
+#
+# Get-RouterShapeErrors (B2): EXACT router shape for a flattened single-output Code node
+# feeding its router: exactly ONE predecessor edge (from that emitter), the wired output
+# indexes exactly 0..Successors.Count-1, and each output carrying EXACTLY ONE successor.
+# Membership tests passed in the presence of a second predecessor edge, a duplicated
+# edge or a dangling extra output.
+#
+# Get-JsCodeBody (B1): the jsCode with /* ... */ blocks and line-leading // comments
+# stripped, so an emitter / guard check can never be satisfied by comment text alone
+# (comment-invariant); comments in this workflow write markers as `field = 'X'`,
+# `('X')` or `field : ` while the code writes `field: 'X'`.
+function Get-IfConditionObjects {
+    param([string]$NodeName)
+    $result = @()
+    $node = $script:NodeByName[$NodeName]
+    if ($null -eq $node) { return $result }
+    if ($null -ne $node.parameters -and $node.parameters.PSObject.Properties.Name -contains 'conditions' -and $null -ne $node.parameters.conditions) {
+        $cc = $node.parameters.conditions.conditions
+        if ($null -ne $cc) { $result = @($cc) }
     }
-    return @($result)
+    return $result
+}
+
+function Get-ConditionsShapeErrors {
+    param([string]$Where, [array]$Conditions, [array]$ExpectedLefts)
+    $errors = New-Object System.Collections.Generic.List[string]
+    $conds = @($Conditions)
+    $expected = @($ExpectedLefts)
+    if ($conds.Count -ne $expected.Count) {
+        $errors.Add($Where + ' declares ' + $conds.Count.ToString() + ' condition(s); the design requires EXACTLY ' + $expected.Count.ToString())
+        return @($errors)
+    }
+    for ($i = 0; $i -lt $expected.Count; $i++) {
+        $cond = $conds[$i]
+        $lv = ''
+        $opType = ''
+        $opOperation = ''
+        if ($null -ne $cond) {
+            if ($cond.PSObject.Properties.Name -contains 'leftValue') { $lv = [string]$cond.leftValue }
+            if ($cond.PSObject.Properties.Name -contains 'operator' -and $null -ne $cond.operator) {
+                if ($cond.operator.PSObject.Properties.Name -contains 'type') { $opType = [string]$cond.operator.type }
+                if ($cond.operator.PSObject.Properties.Name -contains 'operation') { $opOperation = [string]$cond.operator.operation }
+            }
+        }
+        if ($lv -cne $expected[$i]) {
+            $errors.Add($Where + ' condition ' + $i.ToString() + ' must be EXACTLY ' + $expected[$i] + ' (operand and operator pinned, case-sensitive); found: ' + $lv)
+        }
+        if ($opType -ne 'boolean' -or $opOperation -ne 'true') {
+            $errors.Add($Where + ' condition ' + $i.ToString() + " must carry operator type=boolean operation=true (the single-value boolean evaluation of the pinned expression); found type='" + $opType + "' operation='" + $opOperation + "'")
+        }
+    }
+    return @($errors)
+}
+
+function Get-RouterShapeErrors {
+    param([string]$Router, [string]$OnlySource, [array]$Successors)
+    $errors = New-Object System.Collections.Generic.List[string]
+    $preds = @(Get-SourceRefsOf -Target $Router)
+    if ($preds.Count -ne 1 -or $preds[0] -cne $OnlySource) {
+        $errors.Add($Router + ' must be fed by EXACTLY ONE edge from ' + $OnlySource + ' (emitter -> router, single-input exclusivity); found ' + $preds.Count.ToString() + ' predecessor edge(s) from [' + ($preds -join ', ') + '] (correction cycle 2, exact-set exclusivity)')
+    }
+    $successorList = @($Successors)
+    $idxSet = New-Object System.Collections.Generic.HashSet[int]
+    foreach ($r in $script:AllRefs) { if ($r.Source -eq $Router) { [void]$idxSet.Add([int]$r.Index) } }
+    $idxText = (($idxSet | Sort-Object | ForEach-Object { $_.ToString() }) -join ', ')
+    if ($idxSet.Count -ne $successorList.Count) {
+        $errors.Add($Router + ' must wire EXACTLY the output indexes 0..' + ($successorList.Count - 1).ToString() + '; observed output indexes [' + $idxText + '] (dangling or missing output, correction cycle 2)')
+    }
+    else {
+        for ($i = 0; $i -lt $successorList.Count; $i++) {
+            if (-not $idxSet.Contains($i)) {
+                $errors.Add($Router + ' does not wire the expected output index ' + $i.ToString() + '; observed output indexes [' + $idxText + '] (correction cycle 2)')
+            }
+        }
+    }
+    for ($i = 0; $i -lt $successorList.Count; $i++) {
+        $t = @(Get-TargetsOf -Source $Router -Index $i)
+        $want = [string]$successorList[$i]
+        if ($t.Count -ne 1 -or $t[0] -cne $want) {
+            $errors.Add($Router + ' output ' + $i.ToString() + ' must feed EXACTLY ONE edge to ' + $want + '; found ' + $t.Count.ToString() + ' target(s) [' + ($t -join ', ') + '] (successor-set exclusivity, correction cycle 2)')
+        }
+    }
+    return @($errors)
+}
+
+function Get-JsCodeBody {
+    param([string]$JsCode)
+    if ([string]::IsNullOrEmpty($JsCode)) { return '' }
+    $body = [regex]::Replace($JsCode, '(?s)/\*.*?\*/', ' ')
+    $body = [regex]::Replace($body, '(?m)^\s*//.*$', '')
+    return $body
 }
 
 $terminalStates = @('GENERATED', 'REJECTED')
@@ -1656,31 +1789,98 @@ else {
 if (-not $script:NodeByName.ContainsKey('AdoptE2Reconcile')) {
     $a35.Add('AdoptE2Reconcile is missing: the already-GENERATED metadata read must be adopted in exactly one place (R3)')
 }
+elseif (-not $script:NodeByName.ContainsKey('SwitchE2Route')) {
+    $a35.Add('SwitchE2Route is missing: the flattened AdoptE2Reconcile (single output, C5 runtime fix) needs its router to restore the GENERATED / continuation / fallback branch topology')
+}
 else {
-    $g0 = @(Get-TargetsOf -Source 'AdoptE2Reconcile' -Index 0)
-    $g1 = @(Get-TargetsOf -Source 'AdoptE2Reconcile' -Index 1)
-    $g2 = @(Get-TargetsOf -Source 'AdoptE2Reconcile' -Index 2)
-    if ($g0 -notcontains 'E6VerifyDocument') { $a35.Add('AdoptE2Reconcile output 0 must feed E6VerifyDocument: GENERATED may only be declared after the 200 E6 (R3); found [' + ($g0 -join ', ') + ']') }
-    if ($g1 -notcontains 'E4ReconcileValidate') { $a35.Add('AdoptE2Reconcile output 1 must feed E4ReconcileValidate: a VALIDATED / DRAFT / FAILED resume read is completed by E4 then E5 (3.3, R6); found [' + ($g1 -join ', ') + ']') }
-    if ($g2 -notcontains 'FinalizeResponse') { $a35.Add('AdoptE2Reconcile output 2 must feed FinalizeResponse; found [' + ($g2 -join ', ') + ']') }
-    $adoptReach = Get-NodeReachSet -Start 'AdoptE2Reconcile'
-    if ($adoptReach.Contains('E3PatchRequest')) { $a35.Add('E3PatchRequest is reachable downstream of AdoptE2Reconcile: an E2 read must never mutate the request (T14)') }
+    # AdoptE2Reconcile now exposes exactly ONE connection output, which must feed
+    # SwitchE2Route; the router restores the former output 0/1/2 topology on the
+    # __route markers (GENERATED_REPLAY / E4_CONTINUATION / fallback).
+    # Correction cycle 2 (B2): EXACT successor set - exactly ONE EDGE to SwitchE2Route.
+    # The cycle-1 output-index/target-membership test still passed when a second edge
+    # (even a duplicated one to the same target) left this node, because the targets
+    # were de-duplicated before the membership test.
+    $aeEdges = @($script:AllRefs | Where-Object { $_.Source -eq 'AdoptE2Reconcile' })
+    $aeOutputIdx = New-Object System.Collections.Generic.HashSet[int]
+    $aeTargets = New-Object System.Collections.Generic.List[string]
+    foreach ($aeEdge in $aeEdges) { [void]$aeOutputIdx.Add([int]$aeEdge.Index); $aeTargets.Add([string]$aeEdge.Target) }
+    if ($aeEdges.Count -ne 1 -or $aeTargets.Count -ne 1 -or $aeTargets[0] -cne 'SwitchE2Route') {
+        $a35.Add('AdoptE2Reconcile must expose exactly ONE EDGE feeding SwitchE2Route; observed ' + $aeEdges.Count.ToString() + ' edge(s), output indexes [' + (($aeOutputIdx | Sort-Object | ForEach-Object { $_.ToString() }) -join ', ') + '] targets [' + (($aeTargets | Sort-Object -Unique) -join ', ') + '] (exact-set exclusivity, correction cycle 2)')
+    }
+    foreach ($shapeErr in (Get-RouterShapeErrors -Router 'SwitchE2Route' -OnlySource 'AdoptE2Reconcile' -Successors @('E6VerifyDocument', 'E4ReconcileValidate', 'FinalizeResponse'))) { $a35.Add($shapeErr) }
+    $rteOutputIdx = New-Object System.Collections.Generic.HashSet[int]
+    foreach ($r in $script:AllRefs) { if ($r.Source -eq 'SwitchE2Route') { [void]$rteOutputIdx.Add([int]$r.Index) } }
+    if ($rteOutputIdx.Count -ne 3) {
+        $a35.Add('SwitchE2Route must expose 3 outputs (GENERATED_REPLAY / E4_CONTINUATION / fallback, the former AdoptE2Reconcile outputs 0/1/2); found ' + $rteOutputIdx.Count.ToString())
+    }
+    $g0 = @(Get-TargetsOf -Source 'SwitchE2Route' -Index 0)
+    $g1 = @(Get-TargetsOf -Source 'SwitchE2Route' -Index 1)
+    $g2 = @(Get-TargetsOf -Source 'SwitchE2Route' -Index 2)
+    if ($g0 -notcontains 'E6VerifyDocument') { $a35.Add('SwitchE2Route output 0 (__route GENERATED_REPLAY, formerly AdoptE2Reconcile output 0) must feed E6VerifyDocument: GENERATED may only be declared after the 200 E6 (R3); found [' + ($g0 -join ', ') + ']') }
+    if ($g1 -notcontains 'E4ReconcileValidate') { $a35.Add('SwitchE2Route output 1 (__route E4_CONTINUATION, formerly AdoptE2Reconcile output 1) must feed E4ReconcileValidate: a VALIDATED / DRAFT / FAILED resume read is completed by E4 then E5 (3.3, R6); found [' + ($g1 -join ', ') + ']') }
+    if ($g2 -notcontains 'FinalizeResponse') { $a35.Add('SwitchE2Route output 2 (fallback, formerly AdoptE2Reconcile output 2) must feed FinalizeResponse; found [' + ($g2 -join ', ') + ']') }
+    # The two routing rules must test the __route markers emitted by AdoptE2Reconcile.
+    # Correction cycle 2 (S1): EXACT rule count (a third rule could shadow an output)
+    # and FULL condition pin per rule - exact leftValue text (operand + operator,
+    # case-sensitive) with the boolean/true operator - not a substring mention of the
+    # marker anywhere in the concatenated rule text.
+    $rteRules = @()
+    $rteNode = $script:NodeByName['SwitchE2Route']
+    if ($null -ne $rteNode.parameters -and $rteNode.parameters.PSObject.Properties.Name -contains 'rules' -and $null -ne $rteNode.parameters.rules) { $rteRules = @($rteNode.parameters.rules.values) }
+    if ($rteRules.Count -ne 2) {
+        $a35.Add('SwitchE2Route declares ' + $rteRules.Count.ToString() + ' rule(s); the design requires EXACTLY 2 (GENERATED_REPLAY, E4_CONTINUATION) plus the fallback output')
+    }
+    else {
+        $rte0Conds = @()
+        if ($null -ne $rteRules[0].conditions -and $null -ne $rteRules[0].conditions.conditions) { $rte0Conds = @($rteRules[0].conditions.conditions) }
+        $rte1Conds = @()
+        if ($null -ne $rteRules[1].conditions -and $null -ne $rteRules[1].conditions.conditions) { $rte1Conds = @($rteRules[1].conditions.conditions) }
+        foreach ($shapeErr in (Get-ConditionsShapeErrors -Where 'SwitchE2Route rule 0 (formerly AdoptE2Reconcile output 0)' -Conditions $rte0Conds -ExpectedLefts @('={{ $json.__route === ''GENERATED_REPLAY'' }}'))) { $a35.Add($shapeErr) }
+        foreach ($shapeErr in (Get-ConditionsShapeErrors -Where 'SwitchE2Route rule 1 (formerly AdoptE2Reconcile output 1)' -Conditions $rte1Conds -ExpectedLefts @('={{ $json.__route === ''E4_CONTINUATION'' }}'))) { $a35.Add($shapeErr) }
+    }
+    # Correction cycle 1: the fallback must exist and be explicit. Without
+    # options.fallbackOutput='extra' an item carrying neither __route marker would match
+    # NO rule and n8n would drop it instead of reaching FinalizeResponse (the former
+    # AdoptE2Reconcile output 2).
+    $rteFallback = ''
+    if ($null -ne $rteNode.parameters -and $rteNode.parameters.PSObject.Properties.Name -contains 'options' -and $null -ne $rteNode.parameters.options -and $rteNode.parameters.options.PSObject.Properties.Name -contains 'fallbackOutput') {
+        $rteFallback = [string]$rteNode.parameters.options.fallbackOutput
+    }
+    if ($rteFallback -ne 'extra') {
+        $a35.Add("SwitchE2Route options.fallbackOutput must be 'extra' (the fallback output owning the former AdoptE2Reconcile output 2, where every unmarked item resolves to FinalizeResponse); found '" + $rteFallback + "'")
+    }
+    # Full (all-outputs) reachability: no E3PatchRequest may be reachable downstream of
+    # AdoptE2Reconcile through ANY router branch: an E2 read must never mutate (T14).
+    $adoptReach = Get-NodeReachSetAll -Start 'AdoptE2Reconcile'
+    if ($adoptReach.Contains('E3PatchRequest')) { $a35.Add('E3PatchRequest is reachable downstream of AdoptE2Reconcile (through a SwitchE2Route branch): an E2 read must never mutate the request (T14)') }
     # R6 + T14: the E4 continuation must be closed for a RECONCILIATION read. The guard is
     # asserted on the Code body because the reach set cannot distinguish the two reads.
+    # Correction cycle 2 (B1): every check below runs on the COMMENT-STRIPPED body and is
+    # CODE-SHAPED - a comment mentioning the guard, the three resumable statuses, the
+    # counter or a marker can no longer satisfy it, and the match is case-sensitive.
     $adoptJs = [string]$script:JsCodeByNode['AdoptE2Reconcile']
+    $adoptBody = Get-JsCodeBody -JsCode $adoptJs
     if ($adoptJs -eq '') { $a35.Add('AdoptE2Reconcile jsCode not found: the resume-only guard on the E4 continuation cannot be checked') }
     else {
-        if ($adoptJs -notmatch "E2ReconcileRequest") {
-            $a35.Add('AdoptE2Reconcile never references E2ReconcileRequest: the E4 continuation must be closed for a reconciliation read (T14, 3.2 line 176)')
+        if ($adoptBody -cnotmatch [regex]::Escape('$(''E2ReconcileRequest'').isExecuted')) {
+            $a35.Add("AdoptE2Reconcile must read $('E2ReconcileRequest').isExecuted (code-shaped, comment-invariant) before opening the E4 continuation; otherwise a reconciliation of a 409 / DATABASE_ERROR / timeout would mutate the request (T14, 3.2 line 176)")
         }
-        if ($adoptJs -notmatch 'isExecuted') {
-            $a35.Add('AdoptE2Reconcile must test whether E2ReconcileRequest executed before opening the E4 continuation; otherwise a reconciliation of a 409 / DATABASE_ERROR / timeout would mutate the request (T14)')
+        if ($adoptBody -cnotmatch 'RESUMABLE_STATES\s*=\s*\[\s*''VALIDATED''\s*,\s*''DRAFT''\s*,\s*''FAILED''\s*\]') {
+            $a35.Add("AdoptE2Reconcile must pin the resume whitelist as the exact assignment RESUMABLE_STATES = ['VALIDATED', 'DRAFT', 'FAILED'] (comment-invariant: a comment naming the three statuses no longer satisfies this check) (R6)")
         }
-        foreach ($st in $resumeStates) {
-            if ($adoptJs -notmatch [regex]::Escape($st)) { $a35.Add('AdoptE2Reconcile does not mention the resumable status ' + $st + ': the E4 continuation whitelist must be explicit, not implicit (R6)') }
+        if ($adoptBody -cnotmatch 'e5Attempted\s*:\s*0\b') {
+            $a35.Add('AdoptE2Reconcile must carry e5Attempted: 0 on the continuation item (code-shaped), otherwise the recovery guard cannot prove that this E5 attempt is the FIRST one (R2)')
         }
-        if ($adoptJs -notmatch 'e5Attempted') {
-            $a35.Add('AdoptE2Reconcile must carry the R2 counter e5Attempted on the continuation item, otherwise the recovery guard cannot prove that this E5 attempt is the FIRST one')
+        # Emitter <-> condition pairing (correction cycle 1, hardened by cycle 2): the
+        # router rules above are only correct if this node still WRITES both markers.
+        # Assignment-shaped (field: 'MARKER') on the comment-stripped body: a near-miss
+        # like GENERATED_REPLAY_X, a quote change or a comment-only mention is caught.
+        foreach ($rtePair in @(
+            @{ Marker = "'GENERATED_REPLAY'"; Pattern = '__route:\s*''GENERATED_REPLAY''' },
+            @{ Marker = "'E4_CONTINUATION'";  Pattern = '__route:\s*''E4_CONTINUATION''' })) {
+            if ($adoptBody -cnotmatch $rtePair.Pattern) {
+                $a35.Add('AdoptE2Reconcile jsCode no longer WRITES the marker ' + $rtePair.Marker + ' on its __route field (comment-invariant emitter<->condition pairing) that its router SwitchE2Route tests: every item would fall through to the fallback')
+            }
         }
     }
 }
@@ -1701,8 +1901,8 @@ else {
     $rs1 = @(Get-TargetsOf -Source 'E2ReconcileRequest' -Index 1)
     if ($rs0 -notcontains 'AdoptE2Reconcile') { $a35.Add('E2ReconcileRequest success must feed AdoptE2Reconcile; found [' + ($rs0 -join ', ') + ']') }
     if ($rs1 -notcontains 'FinalizeResponse') { $a35.Add('E2ReconcileRequest error must feed FinalizeResponse; found [' + ($rs1 -join ', ') + ']') }
-    $reconReach = Get-NodeReachSet -Start 'E2ReconcileRequest'
-    if ($reconReach.Contains('E3PatchRequest')) { $a35.Add('E3PatchRequest is reachable downstream of E2ReconcileRequest: a reconciliation must never mutate the request (T14)') }
+    $reconReach = Get-NodeReachSetAll -Start 'E2ReconcileRequest'
+    if ($reconReach.Contains('E3PatchRequest')) { $a35.Add('E3PatchRequest is reachable downstream of E2ReconcileRequest (through any AdoptE2Reconcile / SwitchE2Route branch): a reconciliation must never mutate the request (T14)') }
 }
 
 if (-not $script:NodeByName.ContainsKey('RouteMutatingFailure')) {
@@ -1758,14 +1958,21 @@ else {
     }
 }
 
-# R2: the bounded recovery chain is wired exactly once and every edge terminates.
+# R2: the bounded recovery chain is wired exactly once and every edge terminates. The
+# flattened Code nodes feed single-output routers, so the chain includes the router hops
+# (IFRecoveryAllowed after PrepareE5Recovery, IFRecoveryValidated after AdoptE4Recovery)
+# and each hop asserts its single expected consumer. The refused-recovery and other-status
+# terminations are now owned by the router false branches (IFRecoveryAllowed output 1,
+# IFRecoveryValidated output 1); the Code nodes themselves expose a single output.
 $recoveryChain = @(
-    @{ From = 'PrepareE5Recovery'; Index = 0; To = 'E4ReconcileValidate'; Why = 'authorised recovery re-runs the E4 guard (T11)' },
-    @{ From = 'PrepareE5Recovery'; Index = 1; To = 'FinalizeResponse'; Why = 'a refused recovery is classified as-is (2nd attempt failure -> 200 GENERATION_FAILED)' },
+    @{ From = 'PrepareE5Recovery'; Index = 0; To = 'IFRecoveryAllowed'; Why = 'the authorised recovery passes through its single-output router (C5)' },
+    @{ From = 'IFRecoveryAllowed'; Index = 0; To = 'E4ReconcileValidate'; Why = 'authorised recovery re-runs the E4 guard (T11)' },
+    @{ From = 'IFRecoveryAllowed'; Index = 1; To = 'FinalizeResponse'; Why = 'a refused recovery is classified as-is (2nd attempt failure -> 200 GENERATION_FAILED)' },
     @{ From = 'E4ReconcileValidate'; Index = 0; To = 'AdoptE4Recovery'; Why = 'the E4 response of the recovery guard is adopted in one place' },
     @{ From = 'E4ReconcileValidate'; Index = 1; To = 'FinalizeResponse'; Why = 'a failed E4 of the recovery terminates (4: bounded retry then stop)' },
-    @{ From = 'AdoptE4Recovery'; Index = 0; To = 'E5RetryGenerate'; Why = 'VALIDATED is the only status allowed to re-run E5' },
-    @{ From = 'AdoptE4Recovery'; Index = 1; To = 'FinalizeResponse'; Why = 'any other status of the recovery guard is copied verbatim' },
+    @{ From = 'AdoptE4Recovery'; Index = 0; To = 'IFRecoveryValidated'; Why = 'the VALIDATED verdict passes through its single-output router (C5)' },
+    @{ From = 'IFRecoveryValidated'; Index = 0; To = 'E5RetryGenerate'; Why = 'VALIDATED with a UUID requestId is the only case allowed to re-run E5' },
+    @{ From = 'IFRecoveryValidated'; Index = 1; To = 'FinalizeResponse'; Why = 'any other status of the recovery guard is copied verbatim' },
     @{ From = 'E5RetryGenerate'; Index = 0; To = 'AdoptE5Response'; Why = 'the 201 of the 2nd attempt is adopted like the first one (single metadata source)' },
     @{ From = 'E5RetryGenerate'; Index = 1; To = 'FinalizeResponse'; Why = 'a 3rd attempt is impossible: the error of the last attempt terminates here' }
 )
@@ -1779,24 +1986,90 @@ foreach ($edge in $recoveryChain) {
         $a35.Add(($edge.From + ' output ' + $edge.Index.ToString() + ' also feeds ' + $other + ': an unexpected second consumer on the bounded recovery chain (R2)'))
     }
 }
-# AdoptE4Recovery must whitelist VALIDATED and nothing else may reach E5RetryGenerate.
-$adoptRecoveryJs = [string]$script:JsCodeByNode['AdoptE4Recovery']
-if ($adoptRecoveryJs -eq '') {
-    $a35.Add('AdoptE4Recovery jsCode not found: the only status allowed to re-run E5 cannot be checked')
+# The two flattened recovery Code nodes must expose exactly ONE output (their router owns
+# the former second output); a second wired output would bypass the router conditions.
+foreach ($flatNode in @('PrepareE5Recovery', 'AdoptE4Recovery')) {
+    # Correction cycle 2 (B2): EXACT successor - exactly ONE EDGE, on output index 0, to
+    # this node's own router. The cycle-1 index-set test passed when a second edge left
+    # the node for a different target (bypassing the router conditions).
+    $expectedRouter = if ($flatNode -eq 'PrepareE5Recovery') { 'IFRecoveryAllowed' } else { 'IFRecoveryValidated' }
+    $flatEdges = @($script:AllRefs | Where-Object { $_.Source -eq $flatNode })
+    $flatIdx = New-Object System.Collections.Generic.HashSet[int]
+    $flatTargets = New-Object System.Collections.Generic.List[string]
+    foreach ($flatEdge in $flatEdges) { [void]$flatIdx.Add([int]$flatEdge.Index); $flatTargets.Add([string]$flatEdge.Target) }
+    if ($flatEdges.Count -ne 1 -or $flatTargets.Count -ne 1 -or $flatTargets[0] -cne $expectedRouter -or -not $flatIdx.Contains(0)) {
+        $a35.Add($flatNode + ' must expose exactly ONE EDGE on output 0 feeding its router ' + $expectedRouter + ' (C5 flattening); observed ' + $flatEdges.Count.ToString() + ' edge(s), output indexes [' + (($flatIdx | Sort-Object | ForEach-Object { $_.ToString() }) -join ', ') + '] targets [' + (($flatTargets | Sort-Object -Unique) -join ', ') + '] (exact-set exclusivity, correction cycle 2)')
+    }
 }
-elseif ($adoptRecoveryJs -notmatch "'VALIDATED'") {
-    $a35.Add("AdoptE4Recovery must test status === 'VALIDATED': that is the single status the 4 table allows to re-run E5 after the guard")
+# Correction cycle 1: the VALIDATED whitelist lives on the ROUTER, not in the flattened
+# Code node. AdoptE4Recovery now emits one unmarked merged item (a status test inside it
+# would be a dead branch after the C5 flattening), so IFRecoveryValidated's conditions are
+# the ONLY place where a status may open E5RetryGenerate. Both recovery routers must also
+# test exactly the marker their emitter writes (emitter <-> condition pairing).
+# Correction cycle 2 (S1/B2/B1): the condition is FULL-pinned (exact leftValue text +
+# boolean/true operator + exact count, case-sensitive), the router shape is EXACT (one
+# predecessor edge from PrepareE5Recovery, two outputs with one successor each), and
+# the emitter check runs on the COMMENT-STRIPPED body with the assignment shape
+# (field: 'MARKER') so a comment mention cannot satisfy it.
+$iraConds = @(Get-IfConditionObjects -NodeName 'IFRecoveryAllowed')
+foreach ($shapeErr in (Get-ConditionsShapeErrors -Where "IFRecoveryAllowed (the __recovery marker emitted by PrepareE5Recovery)" -Conditions $iraConds -ExpectedLefts @('={{ $json.__recovery === ''E5_BOUNDED_RECOVERY'' }}'))) { $a35.Add($shapeErr) }
+foreach ($shapeErr in (Get-RouterShapeErrors -Router 'IFRecoveryAllowed' -OnlySource 'PrepareE5Recovery' -Successors @('E4ReconcileValidate', 'FinalizeResponse'))) { $a35.Add($shapeErr) }
+$prepareJs2 = [string]$script:JsCodeByNode['PrepareE5Recovery']
+$prepareBody2 = Get-JsCodeBody -JsCode $prepareJs2
+if ($prepareJs2 -eq '') {
+    $a35.Add('PrepareE5Recovery jsCode not found: its emission of the __recovery marker cannot be checked')
+}
+elseif ($prepareBody2 -cnotmatch '__recovery:\s*''E5_BOUNDED_RECOVERY''') {
+    $a35.Add("PrepareE5Recovery jsCode no longer WRITES the marker __recovery 'E5_BOUNDED_RECOVERY' (comment-invariant, assignment-shaped) that its router IFRecoveryAllowed tests (emitter<->condition pairing): no recovery could ever be authorised")
+}
+$frvNode = $script:NodeByName['IFRecoveryValidated']
+$adoptRecoveryJs = [string]$script:JsCodeByNode['AdoptE4Recovery']
+if ($null -eq $frvNode) {
+    $a35.Add('IFRecoveryValidated is missing: the flattened AdoptE4Recovery (single output, C5) needs this router to whitelist VALIDATED before E5RetryGenerate')
 }
 else {
-    foreach ($forbidden in @("'REJECTED'", "'MISSING_INFORMATION'")) {
-        if ($adoptRecoveryJs -match ([regex]::Escape($forbidden) + '\s*\)\s*\{')) {
-            $a35.Add('AdoptE4Recovery opens E5RetryGenerate on ' + $forbidden + ': only VALIDATED may be re-generated (4, line E5)')
+    # Correction cycle 2 (S1): BOTH conditions are FULL-pinned - exact leftValue text
+    # (status VALIDATED, and the UUID-shape test that replaced the former requestId !==
+    # null guard), exact count, case-sensitive, boolean/true operator. A substring test
+    # on 'VALIDATED' or on the regex source passed in the presence of an extra OR-ed
+    # condition; the forbidden-status mention test is subsumed by the pins.
+    $frvConds = @(Get-IfConditionObjects -NodeName 'IFRecoveryValidated')
+    foreach ($shapeErr in (Get-ConditionsShapeErrors -Where 'IFRecoveryValidated (status VALIDATED AND UUID-shaped requestId, the former requestId !== null guard where a non-UUID was null)' -Conditions $frvConds -ExpectedLefts @(
+        '={{ $json.status === ''VALIDATED'' }}',
+        '={{ typeof $json.requestId === ''string'' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test($json.requestId) }}'))) { $a35.Add($shapeErr) }
+    foreach ($shapeErr in (Get-RouterShapeErrors -Router 'IFRecoveryValidated' -OnlySource 'AdoptE4Recovery' -Successors @('E5RetryGenerate', 'FinalizeResponse'))) { $a35.Add($shapeErr) }
+    $frvCombinator = ''
+    if ($null -ne $frvNode.parameters.conditions -and $frvNode.parameters.conditions.PSObject.Properties.Name -contains 'combinator') {
+        $frvCombinator = [string]$frvNode.parameters.conditions.combinator
+    }
+    if ($frvCombinator -ne 'and') {
+        $a35.Add("IFRecoveryValidated conditions must be combined by AND (BOTH VALIDATED and a UUID requestId are required), not '" + $frvCombinator + "': with OR a plain VALIDATED without requestId could reach E5RetryGenerate")
+    }
+    # The Code node must not grow its own (dead) status branch back: one flat unmarked
+    # return, no nested output array, no status test inside the node.
+    if ($adoptRecoveryJs -eq '') {
+        $a35.Add('AdoptE4Recovery jsCode not found: its flat single-output shape cannot be checked')
+    }
+    else {
+        if ($adoptRecoveryJs -match 'return\s*\[\s*\[') {
+            $a35.Add('AdoptE4Recovery still returns a nested output array (return [[...]]): a Code node with typeVersion 2 has ONE output and the branch selection belongs to IFRecoveryValidated (C5)')
+        }
+        if ($adoptRecoveryJs -match "status\s*===\s*'") {
+            $a35.Add("AdoptE4Recovery still branches on a status inside the Code node (status === '...'): that branch is dead after the C5 flattening - the whitelist belongs to IFRecoveryValidated alone")
         }
     }
 }
 
 # R3 / C4: no GENERATED outcome may be produced outside the E6 branch.
 $finalizeBody = [string]$script:JsCodeByNode['FinalizeResponse']
+# Correction cycle 2 (S2): the recovery chain documented inside FinalizeResponse must
+# name BOTH router hops. A stale chain that skips IFRecoveryAllowed / IFRecoveryValidated
+# misdocuments where the branch decisions actually live (the chain is asserted hop by hop
+# by A29/$chainHops and by the A35 $recoveryChain).
+if ($finalizeBody -notmatch [regex]::Escape('PrepareE5Recovery -> IFRecoveryAllowed -> E4ReconcileValidate') -or
+    $finalizeBody -notmatch [regex]::Escape('AdoptE4Recovery -> IFRecoveryValidated -> E5RetryGenerate')) {
+    $a35.Add('FinalizeResponse jsCode must document the R2 recovery chain WITH its router hops (PrepareE5Recovery -> IFRecoveryAllowed -> E4ReconcileValidate -> AdoptE4Recovery -> IFRecoveryValidated -> E5RetryGenerate); a stale chain without the routers misdocuments where the branch decisions live (S2, correction cycle 2)')
+}
 $coIdx = $finalizeBody.IndexOf('const classifyOutcome')
 $generatedReturns = @([regex]::Matches($finalizeBody, "return\s+'GENERATED'"))
 if ($coIdx -ge 0) {
@@ -1820,7 +2093,7 @@ if ($a35.Count -gt 0) {
     Write-Result 'A35' 'FAIL' (($a35 | Sort-Object -Unique) -join '; ')
 }
 else {
-    Write-Result 'A35' 'PASS' ('RouteE2Status routes the E2 read over ' + ($r2Rules.Count + 1).ToString() + ' outputs (GENERATED / VALIDATED+documents / REJECTED / MISSING_INFORMATION / VALIDATED-sans-documents+DRAFT+FAILED / fallback) and exactly ONE output, MISSING_INFORMATION, feeds E3PatchRequest (R6); VALIDATED/DRAFT/FAILED reach E4ReconcileValidate through AdoptE2Reconcile output 1, and that continuation is guarded on the resume read so a reconciliation stays read-only; GENERATED is adopted then verified by E6VerifyDocument and returned only from the E6 branch with complete metadata; E2ReconcileRequest is a read-only GET whose reach set contains no PATCH; RouteMutatingFailure routes the E3/E4/E5 error outputs to the reconciliation read and a received 5xx with a generation cause to the bounded R2 recovery chain PrepareE5Recovery -> E4ReconcileValidate -> AdoptE4Recovery -> E5RetryGenerate, whose error outputs all terminate at FinalizeResponse')
+    Write-Result 'A35' 'PASS' ('RouteE2Status routes the E2 read over ' + ($r2Rules.Count + 1).ToString() + ' outputs (GENERATED / VALIDATED+documents / REJECTED / MISSING_INFORMATION / VALIDATED-sans-documents+DRAFT+FAILED / fallback) and exactly ONE output, MISSING_INFORMATION, feeds E3PatchRequest (R6); AdoptE2Reconcile exposes exactly ONE EDGE feeding its router SwitchE2Route (successor-set exclusivity), whose outputs 0/1/2 (__route GENERATED_REPLAY / __route E4_CONTINUATION / fallback with an explicit fallbackOutput extra) restore the former topology: VALIDATED/DRAFT/FAILED reach E4ReconcileValidate through SwitchE2Route output 1, and that continuation is guarded by the code-shaped read of $(''E2ReconcileRequest'').isExecuted with the resume whitelist pinned as the exact assignment RESUMABLE_STATES = [''VALIDATED'', ''DRAFT'', ''FAILED''] on the comment-stripped body, so a reconciliation stays read-only (a full all-outputs reach set from AdoptE2Reconcile and E2ReconcileRequest contains no E3PatchRequest); GENERATED is adopted then verified by E6VerifyDocument and returned only from the E6 branch with complete metadata; E2ReconcileRequest is a read-only GET; RouteMutatingFailure routes the E3/E4/E5 error outputs to the reconciliation read and a received 5xx with a generation cause to the bounded R2 recovery chain PrepareE5Recovery -> IFRecoveryAllowed -> E4ReconcileValidate -> AdoptE4Recovery -> IFRecoveryValidated -> E5RetryGenerate (each hop exactly one edge), whose error outputs all terminate at FinalizeResponse and whose two flattened nodes each expose exactly ONE EDGE on output 0 to their own router; every recovery/resume router rule is FULL-pinned - exact leftValue text (operand and operator, case-sensitive), boolean/true operator, exact rule and condition counts - against the marker its emitter Code node WRITES with the assignment shape field: ''MARKER'' checked on the comment-stripped body (SwitchE2Route tests AdoptE2Reconcile''s __route markers, IFRecoveryAllowed tests PrepareE5Recovery''s __recovery marker), so comment text can neither satisfy nor break these checks; each router shape is EXACT (one predecessor edge from its emitter, one successor per wired output, no dangling index), and IFRecoveryValidated alone whitelists VALIDATED plus a UUID-shaped requestId on two AND-combined conditions - no other status may open E5RetryGenerate - while AdoptE4Recovery itself stays a flat single-output adapter with no status branch inside; the recovery chain documented inside FinalizeResponse names both router hops (S2)')
 }
 Assert-Deadline
 
@@ -1967,23 +2240,119 @@ else {
     }
 }
 
-# C5: the three orchestration Code nodes must fail fast on their own, with no HTTP
-# call, no LLM call and no persistence after their fault output.
-foreach ($orch in @('LoadPrompt', 'ParseExtraction', 'MergeContext')) {
-    $src0 = @(Get-TargetsOf -Source $orch -Index 0)
-    $src1 = @(Get-TargetsOf -Source $orch -Index 1)
-    if ($src1.Count -eq 0) { $a37.Add($orch + ' has a single output: an orchestration fault would fall through to the next stage instead of stopping (C5, A8 fail-fast)') }
-    elseif ($src1 -notcontains 'FinalizeResponse') {
-        $a37.Add($orch + ' fault output must go straight to FinalizeResponse (A8: zero HTTP call after an orchestration fault); found [' + ($src1 -join ', ') + ']')
+# C5: the three orchestration Code nodes are flattened to a SINGLE output (the n8n 1.94.1
+# Code node typeVersion 2 has one output; a nested [[success],[fault]] return made item 0
+# an array and crashed with "a 'json' property isn't an object") and fail fast through
+# their router: the router sends the fault straight to FinalizeResponse, with no HTTP
+# call, no LLM call and no persistence after the fault (A8).
+# Correction cycle 1: each router must test EXACTLY the marker its emitter writes
+# (emitter <-> condition pairing); otherwise every execution would take the fault branch.
+# Correction cycle 2: each entry also carries the FULL condition pin (Left: exact
+# leftValue text, operand + operator, case-sensitive) and the assignment-shaped emitter
+# pattern (Emit: field: 'MARKER', matched on the comment-stripped body - B1).
+$orchRouters = [ordered]@{
+    'LoadPrompt'      = @{ Router = 'IFPromptLoaded';     Success = 'OllamaExtract';             Marker = "'PROMPT_LOADED'";        Left = '={{ $json.outcome === ''PROMPT_LOADED'' }}';        Emit = 'outcome:\s*''PROMPT_LOADED''' }
+    'ParseExtraction' = @{ Router = 'IFParseDecoded';     Success = 'E8ValidateExtraction';      Marker = "'EXTRACTION_PARSED'";    Left = '={{ $json.outcome === ''EXTRACTION_PARSED'' }}';    Emit = 'outcome:\s*''EXTRACTION_PARSED''' }
+    'MergeContext'    = @{ Router = 'IFContextReady';     Success = 'CheckClarificationBound';   Marker = "'CONTEXT_READY'";        Left = '={{ $json.__context === ''CONTEXT_READY'' }}';      Emit = '__context:\s*''CONTEXT_READY''' }
+}
+$stageNames = @($script:HttpNodeNames) + @('OllamaExtract')
+foreach ($orch in $orchRouters.Keys) {
+    $router = [string]$orchRouters[$orch].Router
+    $successStage = [string]$orchRouters[$orch].Success
+    $marker = [string]$orchRouters[$orch].Marker
+    $orchEdges = @($script:AllRefs | Where-Object { $_.Source -eq $orch })
+    $orchOutputIdx = New-Object System.Collections.Generic.HashSet[int]
+    foreach ($r in $orchEdges) { [void]$orchOutputIdx.Add([int]$r.Index) }
+    $orchTargets = @($orchEdges | ForEach-Object { [string]$_.Target } | Sort-Object -Unique)
+    if ($orchEdges.Count -ne 1 -or $orchOutputIdx.Count -ne 1 -or $orchTargets -notcontains $router) {
+        $a37.Add($orch + ' must expose exactly ONE EDGE (a single connection line) feeding its router ' + $router + '; observed ' + $orchEdges.Count.ToString() + ' edge(s) over output indexes [' + (($orchOutputIdx | ForEach-Object { $_.ToString() }) -join ', ') + '] targets [' + ($orchTargets -join ', ') + '] (C5: a multi-output or duplicate emitter connection is the runtime json-property / double-fire bug, correction cycle 2)')
     }
-    $stageNames = @($script:HttpNodeNames) + @('OllamaExtract')
+    if (-not $script:NodeByName.ContainsKey($router)) {
+        $a37.Add($router + ' is missing: ' + $orch + ' has a single output and needs this router for the C5 / A8 fail-fast branch selection')
+        continue
+    }
+    # Correction cycle 2 (B2): EXACT router shape - exactly ONE predecessor edge (from
+    # this emitter), wired outputs exactly 0/1, one successor each (success/fault).
+    foreach ($shapeErr in (Get-RouterShapeErrors -Router $router -OnlySource $orch -Successors @($successStage, 'FinalizeResponse'))) { $a37.Add($shapeErr) }
+    $src0 = @(Get-TargetsOf -Source $router -Index 0)
+    $src1 = @(Get-TargetsOf -Source $router -Index 1)
+    if ($src0 -notcontains $successStage) {
+        $a37.Add($router + ' output 0 (success) must go to ' + $successStage + '; found [' + ($src0 -join ', ') + ']')
+    }
+    if ($src1 -notcontains 'FinalizeResponse') {
+        $a37.Add($router + ' output 1 (fault) must go straight to FinalizeResponse (A8: zero HTTP call after an orchestration fault); found [' + ($src1 -join ', ') + ']')
+    }
     foreach ($t in $src1) {
-        if ($stageNames -contains $t) { $a37.Add($orch + ' fault output reaches the stage ' + $t + ': an orchestration fault must stop the execution before any backend or LLM call (C5, A8)') }
+        if ($stageNames -contains $t) { $a37.Add($router + ' fault output reaches the stage ' + $t + ': an orchestration fault must stop the execution before any backend or LLM call (C5, A8)') }
     }
     $oj = [string]$script:JsCodeByNode[$orch]
     if ($oj -eq '') { $a37.Add($orch + ' jsCode not found') }
-    elseif ($oj -notmatch 'return\s*\[\s*\[\s*\]\s*,\s*\[') {
-        $a37.Add($orch + ' must return an explicit [[success], [fault]] two-output shape so a fault cannot be mistaken for a success item (C5)')
+    else {
+        if ($oj -match 'return\s*\[\s*\[') {
+            $a37.Add($orch + ' still returns a nested output array (return [[...]]): a Code node with typeVersion 2 has ONE output and a nested array makes item 0 an array instead of an object with .json (the runtime json-property bug the flattening fixes)')
+        }
+        if ($oj -notmatch 'return\s*\[\s*(fail|\{)') {
+            $a37.Add($orch + ' must carry the flat single-output shape: a success or fault path returning a plain item object (return [fail(...)] or return [{ json: ... }]); no such return found (C5)')
+        }
+        # Emitter <-> condition pairing (correction cycle 1, hardened by cycle 2): the
+        # router condition is FULL-pinned (exact leftValue text with operand AND operator,
+        # case-sensitive, exact count - the success marker ' + $marker + '), and this node
+        # must WRITE the marker with the assignment shape field: 'MARKER' on the
+        # COMMENT-STRIPPED body, so a comment mentioning the literal cannot satisfy it.
+        $orchConds = @(Get-IfConditionObjects -NodeName $router)
+        foreach ($shapeErr in (Get-ConditionsShapeErrors -Where ($router + ' (the success marker ' + $marker + ' emitted by ' + $orch + ')') -Conditions $orchConds -ExpectedLefts @([string]$orchRouters[$orch].Left))) { $a37.Add($shapeErr) }
+        $orchBody = Get-JsCodeBody -JsCode $oj
+        if ($orchBody -cnotmatch [string]$orchRouters[$orch].Emit) {
+            $a37.Add($orch + ' jsCode no longer WRITES the marker ' + $marker + ' with the assignment shape (comment-invariant emitter<->condition pairing) that its router ' + $router + ' tests: every item would take the fault branch')
+        }
+    }
+}
+
+# C5 (4th flattened node): CheckClarificationBound is a single output whose router
+# IFBoundNotReached restores the former [0]/[1] topology (limit reached -> FinalizeResponse,
+# otherwise -> CreateOrContinue).
+if (-not $script:NodeByName.ContainsKey('IFBoundNotReached')) {
+    $a37.Add('IFBoundNotReached is missing: the flattened CheckClarificationBound (single output) needs its router for the bound / proceed branch selection (C5)')
+}
+else {
+    $ccbEdges = @($script:AllRefs | Where-Object { $_.Source -eq 'CheckClarificationBound' })
+    $ccbOutputIdx = New-Object System.Collections.Generic.HashSet[int]
+    foreach ($r in $ccbEdges) { [void]$ccbOutputIdx.Add([int]$r.Index) }
+    $ccbTargets = @($ccbEdges | ForEach-Object { [string]$_.Target } | Sort-Object -Unique)
+    if ($ccbEdges.Count -ne 1 -or $ccbOutputIdx.Count -ne 1 -or $ccbTargets -notcontains 'IFBoundNotReached') {
+        $a37.Add('CheckClarificationBound must expose exactly ONE EDGE (a single connection line) feeding IFBoundNotReached; observed ' + $ccbEdges.Count.ToString() + ' edge(s) over output indexes [' + (($ccbOutputIdx | ForEach-Object { $_.ToString() }) -join ', ') + '] targets [' + ($ccbTargets -join ', ') + '] (C5, correction cycle 2)')
+    }
+    # Correction cycle 2 (B2): EXACT router shape - exactly ONE predecessor edge (from
+    # CheckClarificationBound), wired outputs exactly 0/1, one successor each.
+    foreach ($shapeErr in (Get-RouterShapeErrors -Router 'IFBoundNotReached' -OnlySource 'CheckClarificationBound' -Successors @('FinalizeResponse', 'CreateOrContinue'))) { $a37.Add($shapeErr) }
+    $ccb0 = @(Get-TargetsOf -Source 'IFBoundNotReached' -Index 0)
+    $ccb1 = @(Get-TargetsOf -Source 'IFBoundNotReached' -Index 1)
+    if ($ccb0 -notcontains 'FinalizeResponse') { $a37.Add('IFBoundNotReached output 0 (__branch CLARIFICATION_LIMIT_REACHED, the former CheckClarificationBound output 0) must feed FinalizeResponse; found [' + ($ccb0 -join ', ') + ']') }
+    if ($ccb1 -notcontains 'CreateOrContinue') { $a37.Add('IFBoundNotReached output 1 (the former CheckClarificationBound output 1) must feed CreateOrContinue; found [' + ($ccb1 -join ', ') + ']') }
+    $ccbj = [string]$script:JsCodeByNode['CheckClarificationBound']
+    if ($ccbj -ne '' -and $ccbj -match 'return\s*\[\s*\[') {
+        $a37.Add('CheckClarificationBound still returns a nested output array (return [[...]]): the Code node has ONE output (C5 runtime fix)')
+    }
+    if ($ccbj -ne '' -and $ccbj -notmatch 'stop\.concat\(proceed\)') {
+        $a37.Add("CheckClarificationBound must return the flat single-output shape 'return stop.concat(proceed);' (C5)")
+    }
+    # Correction cycle 1: condition <-> emitter pairing, and the bound branch is TERMINAL
+    # (the former CheckClarificationBound output 0): it must reach FinalizeResponse and no
+    # stage (HTTP or LLM) may sit behind it.
+    # Correction cycle 2 (S1/B1): the condition is FULL-pinned (exact leftValue text +
+    # boolean/true operator + exact count, case-sensitive), and the emitter must WRITE
+    # __branch: 'CLARIFICATION_LIMIT_REACHED' (assignment shape) on the COMMENT-STRIPPED
+    # body, so a comment mentioning the marker can neither satisfy nor break the check.
+    $ccbConds = @(Get-IfConditionObjects -NodeName 'IFBoundNotReached')
+    foreach ($shapeErr in (Get-ConditionsShapeErrors -Where "IFBoundNotReached (the marker __branch 'CLARIFICATION_LIMIT_REACHED' emitted by CheckClarificationBound)" -Conditions $ccbConds -ExpectedLefts @('={{ $json.__branch === ''CLARIFICATION_LIMIT_REACHED'' }}'))) { $a37.Add($shapeErr) }
+    $ccbBody = Get-JsCodeBody -JsCode $ccbj
+    if ($ccbj -ne '' -and $ccbBody -cnotmatch '__branch:\s*''CLARIFICATION_LIMIT_REACHED''') {
+        $a37.Add("CheckClarificationBound jsCode no longer WRITES the marker __branch 'CLARIFICATION_LIMIT_REACHED' with the assignment shape (comment-invariant) that its router IFBoundNotReached tests (emitter<->condition pairing): the bound would never fire")
+    }
+    foreach ($t in $ccb0) {
+        if ($stageNames -contains $t) {
+            $a37.Add('IFBoundNotReached output 0 (limit reached) reaches the stage ' + $t + ': the clarification bound is terminal and must go straight to FinalizeResponse, no backend or LLM call after it (C5, A8)')
+        }
     }
 }
 
@@ -2050,7 +2419,7 @@ if ($a37.Count -gt 0) {
     Write-Result 'A37' 'FAIL' (($a37 | Sort-Object -Unique) -join '; ')
 }
 else {
-    Write-Result 'A37' 'PASS' ('technical evidence is read before the business status and a hard receivedFailure guard precedes the business routing; LoadPrompt/ParseExtraction/MergeContext each expose an explicit [[success],[fault]] shape whose fault output reaches FinalizeResponse and no stage; CheckClarificationBound fabricates no status; PrepareE5Recovery and AdoptE4Recovery fabricate neither a backend status nor an outcome on the R2 recovery path; IFExtractionUsable keeps only its reachable acceptance rule and has no dangling output; the Webhook carries no dead responseHeaders')
+    Write-Result 'A37' 'PASS' ('technical evidence is read before the business status and a hard receivedFailure guard precedes the business routing; LoadPrompt/ParseExtraction/MergeContext (and CheckClarificationBound) are flattened to a single output whose router (IFPromptLoaded / IFParseDecoded / IFContextReady / IFBoundNotReached) sends a fault straight to FinalizeResponse and no stage, each flattened emitter (LoadPrompt / ParseExtraction / MergeContext / CheckClarificationBound) exposes EXACTLY ONE edge to its router (no duplicate or side edge), and each of these four routers has an EXACT shape (exactly one predecessor edge from its emitter, wired outputs exactly 0/1 with exactly one successor each, no dangling index), and each of the four router conditions is FULL-pinned - exact leftValue text (operand and operator, case-sensitive), boolean/true operator, exact count - against the marker its flattened emitter WRITES with the assignment shape field: ''MARKER'' checked on the comment-stripped body (PROMPT_LOADED / EXTRACTION_PARSED / CONTEXT_READY / __branch CLARIFICATION_LIMIT_REACHED, comment-invariant emitter<->condition pairing), so comment text can neither satisfy nor break these checks, while the clarification-bound branch stays terminal and reaches no stage; CheckClarificationBound fabricates no status; PrepareE5Recovery and AdoptE4Recovery fabricate neither a backend status nor an outcome on the R2 recovery path; IFExtractionUsable keeps only its reachable acceptance rule and has no dangling output; the Webhook carries no dead responseHeaders')
 }
 Assert-Deadline
 

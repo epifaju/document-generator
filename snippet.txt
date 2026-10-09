@@ -1,0 +1,15 @@
+﻿RRELATION_ID_RE.test(fromBody)) return fromBody;
+  try {
+    const init = $('InitOrchestration').first().json || {};
+    if (typeof init.correlationId === 'string' && CORRELATION_ID_RE.test(init.correlationId)) return init.correlationId;
+  } catch (e) {
+    // no ingress item reachable
+  }
+  return require('crypto').randomUUID();
+};
+
+// FR message authored by one of our own Code nodes (internalDetail proves it), never relayed from
+// the backend.
+const authoredMessage = function () {
+  if (incoming.internalDetail === undefined) return null;
+  if (incoming.error === null || typeof incoming.erro

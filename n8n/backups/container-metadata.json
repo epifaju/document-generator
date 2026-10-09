@@ -1,0 +1,10 @@
+﻿{
+    "ContainerName":  "adgendoc-n8n-test",
+    "Image":  "n8nio/n8n:latest",
+    "ImageId":  "sha256:9fe1d472ce2d764cfac303add9daeaa985dabc728eae07c7d7ed39529bf66d54",
+    "Network":  "bridge",
+    "RestartPolicy":  "no",
+    "Volume":  "n8n-data",
+    "PromptsMount":  "/prompts",
+    "WorkflowsMount":  "/workflows"
+}
