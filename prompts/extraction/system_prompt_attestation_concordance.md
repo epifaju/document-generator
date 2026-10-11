@@ -44,18 +44,22 @@ administrative.
 10. Recopie fidèle des valeurs (accents, apostrophes, traits d'union). Tu ne
     corriges, ne traduis et ne reformules jamais un nom propre.
 
-## Sortie attendue (exemple — ne jamais copier les valeurs)
+## Sortie attendue (forme uniquement — cas « aucune information »)
+
+Ce prompt ne contient AUCUNE valeur d'exemple : aucune identité, aucune date,
+aucun lieu. L'objet ci-dessous illustre la forme attendue pour un message qui
+ne contient aucune information. Il n'y a rien à y recopier.
 
 {
   "documentType": "ATTESTATION_CONCORDANCE",
-  "confidence": 0.97,
-  "data": {
-    "prenom": "Maria",
-    "nom": "Gomes",
-    "dateNaissance": "1985-05-12",
-    "lieuNaissance": "Bissau",
-    "nomIncorrect": "Maria Gomez",
-    "nomCorrect": "Maria Gomes"
-  },
-  "missingFields": []
+  "confidence": 0.0,
+  "data": {},
+  "missingFields": [
+    "prenom",
+    "nom",
+    "dateNaissance",
+    "lieuNaissance",
+    "nomIncorrect",
+    "nomCorrect"
+  ]
 }
