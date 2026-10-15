@@ -186,6 +186,292 @@ Règles explicites :
 - `confidence` de l'extraction (le cas échéant) n'est **pas** utilisé pour
   contourner la validation métier (seuil éventuel : voir OQ-5).
 
+### 6.1 Règles d'attribution identité / concordance (A-1, A-5, D-1)
+
+> Portée : `ATTESTATION_CONCORDANCE` uniquement. Règles **déterministes**,
+> sans aucun appel LLM (ancrage `N8N_CONTRACTS.md` §5 : budget §4 inchangé
+> ≤ 19 appels/exécution, repli sur les codes métier existants §3.4). Elles
+> précisent §3 (familles de champs) et §5.2 (interdiction d'inventer) ;
+> l'ordre de validation V1–V7 (§6 ci-dessus) et les règles N1–N9 (§7) sont
+> inchangés. Elles **ne ferment pas** OQ-7 (§12).
+
+#### 6.1.1 A-1 — familles de champs
+
+| Famille | Champs | Sens business |
+|---|---|---|
+| `IDENTITE` | `prenom`, `nom` | identité de la personne pour qui l'attestation est établie |
+| `CONCORDANCE` | `nomIncorrect`, `nomCorrect` | formes attestées à concorder : forme erronée ↔ forme correcte |
+
+**Règle A-1** — lorsque la demande exprime **explicitement** une forme
+incorrecte et une forme correcte (marqueurs §6.1.2), l'extraction **DOIT**
+renseigner `nomIncorrect` / `nomCorrect` avec les **formes complètes**
+fournies par l'utilisateur ; elle **NE DOIT PAS** découper ces formes ni en
+répartir les tokens pour remplir `prenom` / `nom`.
+
+#### 6.1.2 A-5 — pas d'inférence d'identité depuis un segment concordance
+
+**Segment concordance** : portion du message associée à un marqueur de
+concordance ; frontière exacte au tableau ci-dessous. **Union des segments
+concordance** : réunion de toutes les plages de tokens calculées selon
+cette frontière (marqueurs et séparateurs de clause exclus).
+
+**Liste fermée des marqueurs de concordance** (décision 1) —
+reconnaissance après normalisation de comparaison (§6.1.3, étape 2) par
+**contiguïté de tokens**, en égalité **entière** de token (jamais de
+correspondance par sous-chaîne brute) ; le marqueur peut être entouré
+d'autres tokens (« le nom correct est X » reconnaît bien `nom correct`) :
+
+| Canal | Marqueurs acceptés (forme normalisée : minuscules, accents pliés, espaces réduits) |
+|---|---|
+| `nomIncorrect` | `nom incorrect` · `forme incorrecte` · `forme erronee` (« forme erronée ») · `nom errone` (« nom erroné ») · `nom figurant a l'etat civil est incorrect` (« nom figurant à l'état civil est incorrect ») · `nom figure a l'etat civil est incorrect` (« nom figuré à l'état civil est incorrect ») · `nom a l'etat civil est incorrect` (« nom à l'état civil est incorrect ») |
+| `nomCorrect` | `nom correct` · `forme correcte` · `forme officielle` · `nom officiel` |
+
+Règles de reconnaissance :
+
+- égalité **entière** de token : `incorrect` ≠ `correct`, `erronee` ≠
+  `correcte` — les deux canaux ne peuvent jamais se confondre ;
+- en cas de marqueurs débutant au même token : le **plus long** prime ;
+- toute paraphrase **hors** de cette liste n'est pas reconnue (limite
+  assumée, §6.1.5) ;
+- `je suis` **seul n'est jamais un marqueur** (ambigu avec « je suis
+  né(e) le… »).
+
+> **REQUIRES_BUSINESS_VALIDATION** : cette liste fermée est un choix de
+> détection (pas une règle administrative vérifiée) ; extension des
+> formulations officielles à valider par un responsable métier — NON
+> BLOQUANT : une formulation non reconnue reste un faux négatif sans
+> effet sur les codes ni sur les champs persistés.
+
+**Frontière exacte d'un segment** (décision 3) — règle identique pour tout
+marqueur (concordance ou identité) :
+
+| Élément | Règle |
+|---|---|
+| Début | fin du dernier token du marqueur → espaces sautés → `:` éventuel (au plus 1) sauté → espaces sautés → verbe éventuel parmi la liste fermée `est`, `sont` (au plus 1 token) sauté → espaces sautés |
+| Fin (exclusive) | le premier parmi : (a) séparateur de clause `« ; »`, `« . »`, `« ! »`, `« ? »`, `« , »` ; (b) début d'un autre marqueur (concordance ou identité) ; (c) fin du message |
+| Séparateur | n'appartient **pas** au segment |
+| Après calcul | trim (N1) + espaces réduits (N2) ; 0 token ⇒ segment **vide** ⇒ aucun champ renseigné (jamais de valeur supposée) |
+
+**Déclaration explicite d'identité** (décision 5) — seules sources
+acceptées pour `prenom` / `nom`. **Étiquettes ID-1 / ID-2 = sources
+d'identité**, distinctes des endpoints n8n `E1`–`E8` (homonymie évitée) :
+
+- **ID-1 — marqueur d'identité** (liste fermée, frontière identique au
+  tableau ci-dessus) : `je m'appelle` · `je me nomme` · `mon prenom est` ·
+  `mon nom est` · `le demandeur s'appelle` · `nom du demandeur` ;
+- **ID-2 — présentation contextuelle** : la valeur apparaît dans le message
+  **hors de l'union des segments concordance** (ex. « pour Maria Gomes »,
+  « au nom de Maria Gomes »), sans marqueur requis.
+
+L'extraction **DOIT** renseigner `prenom` / `nom` depuis ID-1 ou ID-2
+lorsqu'ils y figurent ; sinon elle les laisse **absents**. Une valeur de
+`prenom` / `nom` dont la **seule** occurrence dans le message est à
+l'intérieur d'un segment concordance est une **inférence** : jamais
+acceptée (A-5), retirée si produite (D-1).
+
+**Règle A-5** — une valeur introduite comme forme incorrecte ou forme
+correcte **ne doit jamais** être découpée automatiquement pour remplir
+`prenom` / `nom`. En cas d'ambiguïté d'attribution (segment vide, valeur
+non dérivable sans supposition) : les champs **`prenom` / `nom` (famille
+`IDENTITE`) restent absents** → `MISSING_INFORMATION` + question
+(décision 6) ; **jamais** de choix silencieux du premier segment trouvé.
+Des segments concordance **divergeant entre eux** sont **hors périmètre
+de D-1** : la valeur extraite de `nomIncorrect` / `nomCorrect` reste en
+place (D-1 ne l'a pas touchée) et la validation existante (V5/V6)
+s'applique — jamais de relecture « intelligente ».
+
+#### 6.1.3 D-1 — détection déterministe des attributions suspectes
+
+**But** : détecter qu'un champ `IDENTITE` a été (re)fabriqué à partir d'un
+segment `CONCORDANCE`, le retirer, puis recalculer `missingFields`.
+
+**Garanties** (décisions 9–10) : aucun champ ajouté à la syntaxe
+`ExtractionResult`, **aucun code d'erreur API ajouté**, **aucun appel
+LLM**, budget `N8N_CONTRACTS.md` §4 inchangé (≤ 19 appels/exécution),
+`MAX_CLARIFICATION_ROUNDS = 5` inchangé, contrats E1–E8 inchangés, graphe
+d'orchestration acyclique préservé (garde en test conditionnel
+déterministe, aucun nœud de boucle ajouté).
+
+**Entrée** : `data` + `missingFields` de l'`ExtractionResult` du round
+courant ; message utilisateur du round courant ; état de la demande
+persisté avant ce round — **si cet état est déjà chargé au moment de la
+garde** (cf. disponibilité en P3) ; `documentType`.
+**Sortie** : forme d'`ExtractionResult` identique, `data` éventuellement
+privée de `prenom` / `nom`, `missingFields` recalculé.
+
+**Étape 0 — garde d'entrée.** Si `documentType ≠
+ATTESTATION_CONCORDANCE` **ou** si **aucun** marqueur de concordance
+(§6.1.2) n'est reconnu dans le message ⇒ **sortie sans modification**
+(une demande sans concordance — dont le scénario S01 — n'est jamais
+affectée).
+
+**Étape 1 — segmentation.** Scan gauche→droite des tokens du message ;
+reconnaissance des marqueurs (plus long prime au même index) ; calcul des
+segments `CONCORDANCE` (canaux `nomIncorrect` / `nomCorrect`) et des
+segments d'identité ID-1 selon la frontière du §6.1.2.
+
+**Étape 2 — tokenisation** (décision 2), appliquée aux segments et aux
+valeurs `IDENTITE` du round :
+
+1. normalisation Unicode **NFC** ; `’` → `'` ;
+2. séparateurs : toute séquence d'espaces (espace, tabulation, retour de
+   ligne) **et** tout caractère hors `[Lettre | Chiffre | ' | -]` (donc
+   `; . , : ! ? ( ) /` ferment un token) ;
+3. un token = plus longue séquence de `[Lettre | Chiffre | ' | -]` ;
+   l'apostrophe et le tiret **intérieurs** font partie du token :
+   `Jean-Pierre` = **1 token**, `d'Almeida` = **1 token** ; un `-` ou `'`
+   isolé (entouré d'espaces) est une frontière — un token réduit à `-` ou
+   `'` est **supprimé** ;
+4. forme de comparaison : minuscules + **pliage des diacritiques**
+   (`é`→`e`, `ç`→`c`) : les accents **ne sont pas significatifs** pour la
+   comparaison D-1, mais les **valeurs conservées ne sont jamais
+   réécrites** (N1–N9 restent les seules normalisations de stockage,
+   décision 8) ;
+5. les particules N6 (`da`, `van`, `de`…) sont des **tokens à part
+   entière**, comparées comme tout autre token.
+
+**Étape 3 — comparaison fenêtrée de tokens** (décision 2 : uniquement des
+**séquences de tokens** ; la correspondance par **sous-chaîne brute est
+interdite** — `substring` jamais utilisé) :
+
+- égalité = égalité **entière** de token (`gomes` ≠ `gomez`, `pedro` ≠
+  `petro`, `correct` ≠ `incorrect`) ;
+- fenêtre glissante sur les tokens de chaque segment `CONCORDANCE`,
+  longueur de fenêtre **≥ 2** ;
+- **T1 (champ individuel)** : pour `f ∈ {prenom, nom}` présent dans `data`
+  et dont `tokens(f)` compte ≥ 2 tokens, `tokens(f)` apparaît comme
+  sous-séquence **contiguë** dans un segment `CONCORDANCE` ;
+- **T2 (famille)** : `tokens(prenom) ++ tokens(nom)` (≥ 2 tokens, les deux
+  champs présents dans `data`) apparaît comme sous-séquence contiguë dans
+  un segment `CONCORDANCE` — c'est le cas type « prénom seul + nom seul »
+  (exécution 86, S17) ;
+- si **ni T1 ni T2** ne déclenche : **aucune modification**.
+
+**Étape 4 — protections** (décisions 4, 5, 7) : un champ (ou le run T2)
+qui remplit T1/T2 reste **protégé — donc conservé —** si l'une des
+conditions tient :
+
+- **P1** : le run apparaît **aussi** dans au moins un segment d'identité
+  ID-1 (déclaration explicite, y compris composée : « je m'appelle
+  Jean-Pierre Dupont ») ;
+- **P2** : le run apparaît **aussi** dans le message **hors de l'union des
+  segments concordance** (présentation contextuelle ID-2) — avec la
+  **même sémantique que l'étape 3** : sous-séquence **contiguë** de
+  tokens, égalité **entière** de token, **jamais** de correspondance par
+  sous-chaîne brute ;
+- **P3** : la valeur est **déjà présente dans la demande persistée** avant
+  ce round, **après normalisation N1–N9** (déclarée lors d'un round
+  antérieur) — D-1 n'évalue que les valeurs fournies **en vol** par le
+  round courant et **ne réécrit, ne retire ni ne corrige jamais une donnée
+  stockée** (décision 8 ; preuve de déclaration antérieure : l'état de la
+  demande, seul témoignage disponible — l'historique de messages n'est pas
+  persisté, `N8N_CONTRACTS.md` §7). **Disponibilité de l'état** : dans le
+  flux réel, E2 (état persisté) s'exécute **après** E8 ; si l'état n'est
+  **pas encore chargé** au moment de la garde (placement pré-E8), **P3 =
+  faux** — sans effet observable, car D-1 ne touche jamais aux données
+  stockées et le merge PATCH ne supprime jamais un champ persisté.
+  Variante pleine-fidélité documentée : garde **post-E2 / pré-E3** (P3
+  évaluable) + garde **pré-E1 en round 1** (état non pertinent, P3 faux).
+
+**Décision 5 — explicite vs inféré** : une valeur de `prenom`/`nom` est
+**explicite** si P1 ou P2 tient (ou si elle provient d'un round
+antérieur : P3) ; elle est **inférée** sinon — c'est exactement le cas
+retiré par D-1.
+
+**Étape 5 — retrait (strip)** de chaque champ `IDENTITE` suspect **non
+protégé** : le champ est **retiré du payload** et traité comme **absent**
+(règle N9). Interdictions cumulatives :
+
+- **jamais** de réaffectation de la valeur retirée à un autre champ (pas
+  de « promotion » d'un segment `CONCORDANCE` vers `prenom`/`nom`, ni
+  l'inverse) — A-1, A-5, décision 6 ;
+- **jamais** de modification des champs `CONCORDANCE` ni des autres champs
+  du payload (leur validité relève de V4–V6, inchangés) ;
+- **jamais** de correction d'orthographe : `Gomez` ne devient `Gomes`
+  **que** sur déclaration explicite de l'utilisateur (décision 8,
+  §10 — rien à attester en cas d'identique ⇒ V6).
+
+**Étape 6 — recalcul de `missingFields` et repli sur les codes
+existants** : **hors backend**, le `missingFields` recalculé est **limité
+au payload du round courant après retrait** — l'état persisté ne sert
+qu'à la protection P3 et **n'entre pas** dans ce calcul — et il respecte
+l'invariant `allOf` de `N8N_CONTRACTS.md` §5 **entendu payload-scoped**
+(toutes les clés obligatoires encore absentes **de ce payload** ; sinon
+E8 rejetterait un round partiel pourtant correct → `502`). Le recalcul
+**fusionné payload + état** est **l'exclusivité du backend après merge**
+(V4 + N9) : lui seul décide `status`. Si ce recalcul constate ≥ 1 champ
+obligatoire absent ⇒ `status = MISSING_INFORMATION`, HTTP **422**, code
+**existant** `ERR_CHAMP_OBLIGATOIRE_ABSENT` (§10.1) — **aucun code
+d'erreur API ajouté** (décision 9). La question posée à l'utilisateur
+cible **uniquement** les clés de `missingFields` : dans S17, **une seule
+question explicite d'identité**, **pas** de re-demande corrective des
+formes concordance (elles sont présentes et valides).
+
+**Étape 7 — placement et coûts** (décision 10) : la garde s'applique au
+payload du round **avant toute persistance**. **Placement retenu en
+itération 1 : n8n** — nœud déterministe entre l'extraction et E8/E3, seul
+environnement disposant du message utilisateur et de l'état du round (via
+E2). La variante « validation backend entre V3 et V4 » est **conditionnée
+à une décision de contrat future** (E1/E3/E8 devraient transporter le
+message et l'état — aujourd'hui le backend ne reçoit ni l'un ni l'autre) :
+elle est donc **hors périmètre de l'itération 1** et incompatible avec
+`N8N_CONTRACTS.md` §7 non-objectifs (« Toute modification des contrats
+E1–E8 ») tant qu'aucune évolution de contrat n'est arbitrée (voir OQ-10).
+Pour le placement retenu : **0 appel LLM supplémentaire**, budget
+`N8N_CONTRACTS.md` §4 inchangé, boucle de conversation §5 inchangée
+(round ≥ 2 : E2 → extraction delta → E8 → E3 PATCH partiel), **aucune
+modification des contrats E1–E8**.
+
+#### 6.1.4 Cas positifs (doivent rester valides)
+
+| # | Cas | Message / état | Résultat attendu |
+|---|---|---|---|
+| CP-1 | Identité composée déclarée | « je m'appelle Jean-Pierre Dupont » (aucun marqueur concordance) | Étape 0 : sortie sans modification — `prenom=Jean-Pierre` (1 token), `nom=Dupont` conservés |
+| CP-2 | Happy path API (S01) | payload complet, sans message conversationnel | Étape 0 : aucun marqueur ⇒ aucune modification des 6 champs |
+| CP-3 | Concordance + présentation contextuelle | « Génère une attestation pour Maria Gomes, forme erronée Maria Gomez, forme correcte Maria Gomes. » | `nomIncorrect=Maria Gomez` et `nomCorrect=Maria Gomes` en **formes complètes** (A-1) ; `prenom=Maria`, `nom=Gomes` conservés (occurrence hors segments ⇒ P2) |
+| CP-4 | Particules N6 | « je m'appelle Joao da Silva » | `da` = token à part entière ; identité conservée |
+| CP-5 | Round ≥ 2, valeurs légitimes | `dateNaissance` / `lieuNaissance` déjà persistés ; le round fournit `nomCorrect` seul | E3 ne transmet que le champ fourni (`N8N_CONTRACTS.md` §5) ; D-1 ne retire rien (aucun T1/T2, ou protection P3) |
+
+#### 6.1.5 Limites connues de la détection (faux positifs / faux négatifs)
+
+- Paraphrases **hors** des listes fermées (§6.1.2) : marqueur non reconnu
+  ⇒ attribution suspecte non détectée (faux négatif).
+- Chevauchement d'**un seul token** : sous le seuil ≥ 2 (ex. extraction
+  ne produisant que `nom=Miguel`, ou `prenom=Pedro` seul sans `nom`) ⇒
+  non détecté (T2 exige les deux champs).
+- Run également présent **hors** segments (P2) : valeur conservée — faux
+  négatif **assumé**, priorité à la préservation d'une déclaration
+  légitime (décision 7).
+- `prenom`/`nom` extraits dans l'ordre inversé ou agrégés autrement que
+  `prenom ++ nom` : T2 peut ne pas correspondre.
+- Séparateur de clause **dans** une forme légitime (virgule ou point) :
+  troncature prématurée du segment.
+- Pliage diacritique : `José` ≡ `Jose` pour la comparaison (cela **élargit**
+  la détection) ; les valeurs persistées restent intactes.
+- Donnée suspecte **déjà persistée** avant l'introduction de D-1 : jamais
+  réécrite rétroactivement (P3) — correction = action explicite de
+  l'utilisateur.
+- **D-1 est une heuristique déterministe bornée : elle ne prétend pas
+  détecter toutes les attributions erronées ni toutes les hallucinations
+  du LLM.** Elle réduit le risque observé en itération 1 sans le
+  supprimer ; elle n'invente, ne complète et ne corrige aucune valeur en
+  cascade.
+
+#### 6.1.6 Décisions de conception couvertes
+
+| # | Décision | Où |
+|---|---|---|
+| 1 | Liste fermée des marqueurs de concordance | §6.1.2 (tableau canaux) |
+| 2 | Tokenisation (espaces, apostrophes/tirets intérieurs, NFC, casse, diacritiques, particules N6) | §6.1.3 étape 2 + étape 3 |
+| 3 | Frontière exacte du segment (marqueur → séparateur de clause / marqueur suivant / fin de message) | §6.1.2 (tableau frontière) |
+| 4 | Noms composés et déclarations explicites préservés | §6.1.3 étape 4 (P1) + §6.1.4 CP-1/CP-3/CP-4 |
+| 5 | Identité explicite (ID-1/ID-2) vs inférée (segment concordance) | §6.1.2 (sources ID-1/ID-2) + §6.1.3 étape 4 (P1–P3) |
+| 6 | Ambiguïté → champ absent → `MISSING_INFORMATION` + question | §6.1.2 (règle A-5) + §6.1.3 étape 5 |
+| 7 | Préservation des valeurs légitimes (E3 partiel, P1–P3) | §6.1.3 étapes 4–5, §6.1.4 CP-3/CP-5, `N8N_CONTRACTS.md` §5 |
+| 8 | Jamais de correction silencieuse de données persistées | §6.1.3 étape 4 (P3), étape 5, §6.1.5 |
+| 9 | Aucun code d'erreur API ajouté (`MISSING_INFORMATION` / `ERR_CHAMP_OBLIGATOIRE_ABSENT` uniquement) | §6.1.3 garanties + étape 6, `N8N_CONTRACTS.md` §5 |
+| 10 | Aucun appel Ollama supplémentaire (budget ≤ 19, graphe acyclique) | §6.1.3 garanties + étape 7, `N8N_CONTRACTS.md` §4/§5 |
+
 ---
 
 ## 7. RÈGLES DE NORMALISATION (NORMALIZATION_RULES)
@@ -367,6 +653,7 @@ Voir `requirements/API_CONTRACTS.md` pour le mapping HTTP ↔ codes.
 | S14 | Génération happy path | `status=VALIDATED`, template DOCX présent | `POST /api/v1/requests/{id}/generate` | `201` ; `documentId` présent ; `status=GENERATED` ; puis `GET .../documents/{documentId}` → `200` binaire DOCX, `Content-Disposition: attachment` |
 | S15 | Template manquant | `status=VALIDATED` mais template introuvable sur disque | `POST /api/v1/requests/{id}/generate` | `500` ; `code=TEMPLATE_NOT_FOUND` ; `status=FAILED` ; reprise : `POST .../validate` → `200 VALIDATED` puis re-`generate` |
 | S16 | Consultation état inconnu | `requestId` inexistant | `GET /api/v1/requests/{requestId}` | `404` ; `code=REQUEST_NOT_FOUND` ; aucun détail technique fuité |
+| S17 | Attribution erronée d'identité depuis un segment concordance (exécution 86, valeurs fictives) | **Round 2** (`requestId` connu) ; état persisté avant le round : `MISSING_INFORMATION` avec `dateNaissance=1993-04-17` et `lieuNaissance=Nova Cidade`, **sans** `prenom`/`nom`/`nomIncorrect`/`nomCorrect` et sans déclaration d'identité antérieure ; message utilisateur : « …je suis né(e) le 17/04/1993 à Nova Cidade. Le nom figurant à l'état civil est incorrect : Pedro Miguel Santos ; le nom correct est Pedro Miguel Santhos. » ; **extraction défaillante constatée** (qwen2.5:1.5b) : `prenom=Pedro`, `nom=Miguel`, `dateNaissance=1993-04-17`, `lieuNaissance=Nova Cidade`, `nomIncorrect`/`nomCorrect` absents → **outcome constaté** `422` `MISSING_INFORMATION` `missingFields=[nomIncorrect, nomCorrect]` | round 2 : extraction → **D-1 (§6.1.3)** → E8 → E3 PATCH partiel | **Attendu avec A-1 + A-5 + D-1** : l'extraction remplit `nomIncorrect=Pedro Miguel Santos`, `nomCorrect=Pedro Miguel Santhos` (formes complètes) ; identité **non déclarée explicitement** (aucun ID-1/ID-2) ⇒ `prenom`/`nom` **absents** — jamais inférés. Si un LLM produit malgré tout `prenom=Pedro`, `nom=Miguel` : T2 détecte `[pedro, miguel]` contigu dans les segments concordance, aucune protection P1/P2/P3 ⇒ retrait de `prenom`/`nom`, recalcul `missingFields=[prenom, nom]` (ordre canonique §3) ⇒ `422` outcome `MISSING_INFORMATION` posant **une seule question explicite d'identité** (pas de re-demande corrective des formes concordance) ; **branche exécution 86 réelle** : si cette même extraction n'a **pas** renseigné les formes concordance (pattern exécution 86 sans A-1), `missingFields=[prenom, nom, nomIncorrect, nomCorrect]` (les 4 champs restent requis, **aucune forme n'est inventée**) ; codes **existants** uniquement ; ≤ `MAX_CLARIFICATION_ROUNDS=5` ; **0 appel LLM supplémentaire** ; **aucune valeur inventée, aucune correction silencieuse** ; `status=MISSING_INFORMATION` ; `requestId` conservé |
 
 ---
 
@@ -380,9 +667,10 @@ Voir `requirements/API_CONTRACTS.md` pour le mapping HTTP ↔ codes.
 | OQ-4 | Liste des particules de normalisation (N6) et règles de capitalisation : valides pour toutes les origines de noms (luso-africaines, arabes, asiatiques…) ? | Normalisation des noms | **REQUIRES_BUSINESS_VALIDATION** |
 | OQ-5 | Y a-t-il un **seuil de confiance IA** (champ `confidence`) à appliquer avant de soumettre une extraction à validation, et qui décide du comportement en cas de confiance basse ? | n8n / ai-engineer | À définir (hors contrat pilote) |
 | OQ-6 | Le champ `motif` et le champ `sexe` figurent-ils réellement dans le document officiel ? | Template | **REQUIRES_BUSINESS_VALIDATION** |
-| OQ-7 | Cohérence `prenom`/`nom` avec `nomCorrect` (ex. : `nomCorrect` contient-il le prénom ?) : faut-il une règle de cohérence ou peut-elle produire de faux positifs ? | Validation | **REQUIRES_BUSINESS_VALIDATION** — non appliquée en itération 1 |
+| OQ-7 | Cohérence `prenom`/`nom` avec `nomCorrect` (ex. : `nomCorrect` contient-il le prénom ?) : faut-il une règle de cohérence ou peut-elle produire de faux positifs ? | Validation | **REQUIRES_BUSINESS_VALIDATION** — non appliquée en itération 1. **Réf. §6.1 (A-1/A-5/D-1)** : la distinction des familles `IDENTITE`/`CONCORDANCE` et la garde anti-attribution **ne sont pas** la règle de cohérence OQ-7 et **ne ferment pas** cet OQ |
 | OQ-8 | Format d'affichage de `referenceDemande` et de `dateNaissance` sur le document (UUID brut ? référence formatée ? « 12 mai 1985 » ?) | Template | **REQUIRES_BUSINESS_VALIDATION** |
 | OQ-9 | Génération PDF et archivage (AGENTS.md §1, étapes 10–11 de la mission) : périmètre confirmé hors itération 1 ? | Périmètre | À confirmer |
+| OQ-10 | Placement d'exécution exact de la garde D-1 (§6.1.3) : nœud déterministe n8n entre extraction et E8/E3, ou validation backend entre V3 et V4 ? | Implémentation / budget n8n | **ARBITRÉE — RÉSOLUE** : placement **n8n** retenu pour l'itération 1 (§6.1.3 étape 7 : seul n8n dispose du message et de l'état du round) ; la branche backend est **reportée** — elle nécessiterait une évolution des contrats E1/E3/E8, incompatible avec `N8N_CONTRACTS.md` §7 non-objectifs. **Non bloquante** pour l'implémentation : 0 appel LLM, aucun code nouveau, budget §4 inchangé |
 
 ---
 
@@ -397,13 +685,16 @@ Voir `requirements/API_CONTRACTS.md` pour le mapping HTTP ↔ codes.
 - [ ] `optionalFields` documentés avec mêmes colonnes.
 - [ ] `validationRules` explicites et déterministes (ordre d'évaluation
       défini, aucun cas ambigü résiduel).
+- [ ] Règles d'attribution A-1/A-5/D-1 documentées (§6.1) : familles
+      `IDENTITE`/`CONCORDANCE`, listes fermées de marqueurs, algorithme
+      D-1 pas-à-pas, cas positifs (CP-1–CP-5) et limites connues.
 - [ ] `normalizationRules` documentées (N1–N9).
 - [ ] `templateVariables` mappées (placeholders) et marquées
       `REQUIRES_BUSINESS_VALIDATION`.
 - [ ] `businessErrors` documentés par famille avec champ en erreur + message.
 - [ ] Machine à états : 6 statuts, transitions autorisées et interdites
       documentées.
-- [ ] ≥ 8 scénarios Given/When/Then fournis (16 fournis).
+- [ ] ≥ 8 scénarios Given/When/Then fournis (17 fournis : S01–S17).
 - [ ] Interdiction d'inventer des données rappelée et traduite en règles
       techniques (clés inconnues rejetées, clés réservées, défauts interdits).
 - [ ] Tous les points d'ambiguïté métier listés en §12 et escaladés

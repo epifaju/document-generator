@@ -1154,6 +1154,11 @@ Assert-Deadline
 #      implemented (deferred to I.1-B). Neither flag value is enforced there;
 #      the M1 documentation rule is, and a declared maxTries must still match 4.
 #
+# OllamaExtract maxTries: n8n 1.94.1 public API rejects expression-form maxTries (HTTP 400).
+# The §4 equality-to-number is preserved: ONLY integer 3 is accepted.
+# Expression form (including previously accepted clamped-to-3) is REMOVED — not compatible with the deployment channel.
+# The historical expression with ceiling 5 (Math.min(..., 5)) was already rejected as a §4/budget breach.
+#
 #  DEFERRED (A29-E1-DEFERRED, NOT_STATICALLY_PROVABLE):
 #    the E1 conditionality alone. It has no structural counterpart in the
 #    workflow precisely because the E1 retry is deliberately not implemented, and
@@ -1162,7 +1167,7 @@ Assert-Deadline
 #    is routed to PrepareE5Recovery by RouteMutatingFailure, a timeout is not)
 #    and is asserted in A29/A35.
 $retryTable = @(
-    @{ Node = 'OllamaExtract'; Timeout = 'expr:AI_TIMEOUT_MS|60000'; Tries = 'expr:AI_MAX_ATTEMPTS'; Retry = 'hard' },
+    @{ Node = 'OllamaExtract'; Timeout = 'expr:AI_TIMEOUT_MS|60000'; Tries = '3'; Retry = 'hard' },
     @{ Node = 'E8ValidateExtraction'; Timeout = '10000'; Tries = '2'; Retry = 'hard' },
     @{ Node = 'E1CreateRequest'; Timeout = '10000'; Tries = '2'; Retry = 'conditional' },
     @{ Node = 'E2GetRequest'; Timeout = '5000'; Tries = '3'; Retry = 'hard' },
@@ -1206,10 +1211,6 @@ foreach ($row in $retryTable) {
     if ($n.PSObject.Properties.Name -contains 'notes') { $note = [string]$n.notes }
     if ($row.Retry -eq 'hard') {
         if (-not $hasRetry) { $a29.Add(($row.Node + ': retryOnFail must be true (4 prescribes a bounded blanket retry on 5xx/timeout)')) }
-        if ($row.Tries -like 'expr:*') {
-            $needle = $row.Tries.Substring(5)
-            if (-not $hasTries -or ([string]$n.maxTries) -notmatch [regex]::Escape($needle)) { $a29.Add(($row.Node + ': maxTries must bind ' + $needle + ' (4)')) }
-        }
         elseif (-not $hasTries -or ([string]$n.maxTries) -ne $row.Tries) {
             $a29.Add(($row.Node + ': maxTries must be ' + $row.Tries + ' total attempts (4); found ' + $(if ($hasTries) { [string]$n.maxTries } else { '<absent>' })))
         }

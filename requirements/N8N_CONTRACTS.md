@@ -424,6 +424,7 @@ Règles de réconciliation (issue ambiguë, design anti-doublon) :
 | PATCH `409 REQUEST_ALREADY_CLOSED` | E2 → route (`GENERATED` → succès ; `REJECTED` → `REJECTED`) |
 | Borne | `MAX_CLARIFICATION_ROUNDS = 5` (compteur interne n8n, cf. architecture §5 : meilleure estimation, la correction du flux n'en dépend pas) |
 | Jamais | valeur suggérée/inventée, `missingFields` réordonné, donnée renvoyée au LLM (minimisation PII), complétion d'une demande existante par une nouvelle création **lorsque le client renvoie son `requestId`** (OQ-2 — cf. contrat client ci-dessous) |
+| Garde D-1 (anti-attribution erronée) | Garde **déterministe** définie dans `ATTESTATION_CONCORDANCE.md` §6.1 : appliquée au payload du round **avant toute persistance (E1/E3)**, elle peut retirer `prenom`/`nom` suspectés d'avoir été découpés dans un segment concordance, puis recalcule `missingFields` (invariant `allOf` **payload-scoped** du round courant, de la ligne « Rounds ≥ 2 » ci-dessus respecté). **0 appel LLM supplémentaire** (budget §4 inchangé : ≤ 19 appels/exécution) ; **aucun code nouveau** — repli sur les codes métier existants relayés par le backend (`MISSING_INFORMATION` / `ERR_CHAMP_OBLIGATOIRE_ABSENT`, §3.4 : n8n ne produit pas de codes métier) ; **aucune modification des contrats E1–E8** (§7 non-objectifs) ; `MAX_CLARIFICATION_ROUNDS = 5` inchangé ; graphe d'exécution acyclique préservé (test conditionnel, pas de nœud de boucle) |
 
 **Contrat client** : `requestId` est **obligatoire dès le round 2** —
 c'est au client de le conserver et de le renvoyer. Sans `requestId`,
@@ -496,6 +497,12 @@ requise pour la correction du flux ; la reprise se fait uniquement par
 - [ ] E1 n'est jamais retenté après un timeout (ambiguïté non résolue).
 - [ ] E5 en ambiguïté passe toujours par E2 avant toute décision.
 - [ ] `missingFields` de l'outcome = liste backend, ordre préservé.
+- [ ] **Garde D-1** (`ATTESTATION_CONCORDANCE.md` §6.1) : exécutée sans
+      appel LLM supplémentaire (budget §4 inchangé), repli sur les codes
+      métier existants relayés (§3.4), contrats E1–E8 inchangés ; un round
+      avec attribution suspecte aboutit à `MISSING_INFORMATION` (codes
+      existants) dans la borne `MAX_CLARIFICATION_ROUNDS = 5`, sans nouveau
+      code ni nouveau champ de contrat.
 - [ ] `MAX_CLARIFICATION_ROUNDS = 5` : (i) **sans compteur persistant**,
       le flux reste borné et termine (bornes d'exécution + transitions
       backend) ; (ii) **avec persistance des *static data* n8n**
