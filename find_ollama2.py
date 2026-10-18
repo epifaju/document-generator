@@ -1,0 +1,8 @@
+import json
+with open('n8n/workflows/document-generation-v1.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
+for node in data['nodes']:
+    if 'OllamaExtract' in node.get('name', ''):
+        print(f"Node: {node['name']}")
+        print(f"Full node: {json.dumps(node, indent=2)}")
+        print('---')
