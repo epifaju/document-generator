@@ -1,0 +1,5 @@
+4a5bfe7 maj de PRD
+c313cbb docs(L3): revues 1 a 3 (reviewer PASS, security PASS)
+ae640d7 docs(L0c-Q01): E3 REJECTED = HTTP 400, ADR-001 accepte
+b113e87 multi-agent cursor
+8943269 feat: add n8n orchestration skeleton and static gate (I.1-A)

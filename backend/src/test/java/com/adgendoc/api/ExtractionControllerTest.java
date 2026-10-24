@@ -1,14 +1,18 @@
 package com.adgendoc.api;
 
 import com.adgendoc.application.ExtractionValidationService;
+import com.adgendoc.application.RequestService;
 import com.adgendoc.infrastructure.config.CorrelationIdFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -28,6 +32,7 @@ class ExtractionControllerTest {
         ExtractionValidationService service = new ExtractionValidationService(
                 "classpath:prompts/extraction/attestation_concordance.schema.json");
         mockMvc = MockMvcBuilders.standaloneSetup(new ExtractionController(service))
+                .setControllerAdvice(new GlobalExceptionHandler(mock(RequestService.class)))
                 .addFilters(new CorrelationIdFilter())
                 .build();
     }
@@ -149,6 +154,49 @@ class ExtractionControllerTest {
     }
 
     @Test
+    void e8_text_plain_content_type_returns_400_validation_error() throws Exception {
+        expectContentTypeRejected(post("/api/v1/extraction/validate")
+                .contentType(MediaType.TEXT_PLAIN));
+    }
+
+    @Test
+    void e8_form_urlencoded_content_type_returns_400_validation_error() throws Exception {
+        expectContentTypeRejected(post("/api/v1/extraction/validate")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED));
+    }
+
+    @Test
+    void e8_missing_content_type_returns_400_validation_error() throws Exception {
+        expectContentTypeRejected(post("/api/v1/extraction/validate"));
+    }
+
+    @Test
+    void e8_json_charset_iso_8859_1_returns_400_validation_error() throws Exception {
+        expectContentTypeRejected(post("/api/v1/extraction/validate")
+                .contentType("application/json; charset=ISO-8859-1"));
+    }
+
+    @Test
+    void e8_json_without_charset_is_accepted() throws Exception {
+        mockMvc.perform(post("/api/v1/extraction/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validComplete()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.code").doesNotExist());
+    }
+
+    @Test
+    void e8_json_charset_utf8_is_accepted() throws Exception {
+        mockMvc.perform(post("/api/v1/extraction/validate")
+                        .contentType("application/json; charset=UTF-8")
+                        .content(validComplete()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.code").doesNotExist());
+    }
+
+    @Test
     void e8_correlation_id_is_echoed() throws Exception {
         mockMvc.perform(post("/api/v1/extraction/validate")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -157,6 +205,17 @@ class ExtractionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Correlation-Id", "n8n-trace-42"))
                 .andExpect(jsonPath("$.correlationId").value("n8n-trace-42"));
+    }
+
+    private void expectContentTypeRejected(MockHttpServletRequestBuilder request) throws Exception {
+        ResultActions result = mockMvc.perform(request.content(validComplete()));
+        result.andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.correlationId").isNotEmpty())
+                .andExpect(jsonPath("$.missingFields").isArray())
+                .andExpect(jsonPath("$.valid").doesNotExist())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("payload"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"));
     }
 
     private String validComplete() {

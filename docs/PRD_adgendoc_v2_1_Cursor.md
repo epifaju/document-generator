@@ -204,7 +204,7 @@ stateDiagram-v2
 
 Interdits (→ `409`) : E4 depuis `GENERATED`/`REJECTED` (T13/T14, `INVALID_STATUS`) ; E3 depuis `GENERATED`/`REJECTED` (`REQUEST_ALREADY_CLOSED`) ; E5 depuis tout statut ≠ `VALIDATED` (`INVALID_STATUS`).
 
-Règle : transitions centralisées dans **une seule classe** (`RequestStateMachine`), testée exhaustivement (autorisées **et** interdites, matrice statut × endpoint) ; chaque transition écrit un `AuditEvent` dans la même transaction. **Le fait que `REJECTED` soit terminal est une décision produit à rediscuter** (voir §12.3, Q-06).
+Règle : la matrice de transitions existe dans `RequestStatus` (audit G0) ; elle est verrouillée par un test statut × endpoint (transitions autorisées et interdites). Une classe dédiée `RequestStateMachine` reste une PROPOSITION `[PROPOSÉ]`, à n'envisager qu'après ce test. Chaque transition écrit un `AuditEvent` dans la même transaction `[À CONFIRMER : non prouvé par l'audit G0]`. **Le fait que `REJECTED` soit terminal est une décision produit à rediscuter** (voir §12.3, Q-04).
 ## 9. Architecture
 
 **Style `[PROPOSÉ]` :** hexagonale (ports & adapters), cohérente avec « ports/adapters, mappers et conventions d'erreur déjà définis ».
@@ -310,7 +310,7 @@ Codes de champ à préserver : `ERR_PAYLOAD_INVALIDE`, `ERR_DOCUMENT_TYPE_NON_SU
 
 | ID | Constat | Source | Proposition |
 |---|---|---|---|
-| Q-01 | **E3 : contradiction interne.** Le tableau « 200 » cite une rétrogradation vers `REJECTED` (T10) alors que la ligne « 400 » dit qu'une règle violée → `REJECTED` avec 400. N8N §5 route aussi un « PATCH 200 → `REJECTED` ». | API §3.3 ; N8N §5 | Trancher : `REJECTED` via E3 = **400** (recommandé, cohérent avec E1/E4) ; corriger les deux textes et les tests n8n |
+| Q-01 | **RÉSOLUE** — décision humaine, 2026-10-24. `REJECTED` via E3 = HTTP `400` (`ErrorResponse`, `VALIDATION_ERROR`, statut `REJECTED` persisté). | API §3.3 ; N8N §5 | `docs/adr/ADR-001-e3-regle-metier-400.md` |
 | Q-02 | E3 renvoie **200** `MISSING_INFORMATION` quand il reste des champs absents, alors que E1/E4 renvoient **422**. | API §3.3 vs §3.1/3.4 | Documenter explicitement comme choix voulu (la complétion est une conversation) ou aligner |
 | Q-03 | `ErrorResponse.correlationId` typé **UUID**, mais n8n accepte `^[A-Za-z0-9-]{8,64}$` et le filtre backend `^[A-Za-z0-9-]{1,64}$`. | API §2.3 vs N8N §1.1 | Typer `string` (pattern commun) |
 | Q-04 | **`REJECTED` terminal** : une simple faute de date dans `data` fige la demande ; le round suivant impose une **nouvelle** demande (2ᵉ ligne avec la même PII, finding `F-I-4`). | API §1.4, §3.3 ; N8N §5 | Décision produit : autoriser la correction depuis `REJECTED` (E3) ou assumer la duplication et fixer la rétention |
@@ -389,7 +389,7 @@ Conseils d'efficacité : référencer les fichiers avec `@fichier`/`@dossier` pl
 
 ### 15.3 Prompt de démarrage (audit, lecture seule)
 
-> Tu reprends le dépôt Spring Boot EXISTANT `document-generator` (adgendoc). Ne le recrée pas. Lis `AGENTS.md`, `.cursor/rules`, `PRD_adgendoc_v2_2_Cursor.md`, `requirements/*` (dont `API_CONTRACTS.md` et `N8N_CONTRACTS.md`), `docs/architecture.md`, les ADR, les migrations Flyway, les tests, le template DOCX, `tests/n8n/` et `git status`. **Lecture seule : ne modifie aucun fichier.** Produis : (1) une carte des modules ; (2) une matrice FR-xx × {implémenté / partiel / non implémenté / inconnu} × tests × `fichier:ligne` ; (3) les écarts entre le code/les tests et les tableaux §12.1 et §12.2 ; (4) les écarts entre ce PRD et le dépôt ; (5) les 5 risques principaux ; (6) un plan de 5 petites tâches priorisées. Préserve les fichiers non suivis (`=ro`, `opencode.json`). Ne lance ni Docker, ni n8n, ni PostgreSQL, ni Ollama, ni accès réseau sans mon accord.
+> Tu reprends le dépôt Spring Boot EXISTANT `document-generator` (adgendoc). Ne le recrée pas. Lis `AGENTS.md`, `.cursor/rules`, `PRD_adgendoc_v2_1_Cursor.md`, `requirements/*` (dont `API_CONTRACTS.md` et `N8N_CONTRACTS.md`), `docs/architecture.md`, les ADR, les migrations Flyway, les tests, le template DOCX, `tests/n8n/` et `git status`. **Lecture seule : ne modifie aucun fichier.** Produis : (1) une carte des modules ; (2) une matrice FR-xx × {implémenté / partiel / non implémenté / inconnu} × tests × `fichier:ligne` ; (3) les écarts entre le code/les tests et les tableaux §12.1 et §12.2 ; (4) les écarts entre ce PRD et le dépôt ; (5) les 5 risques principaux ; (6) un plan de 5 petites tâches priorisées. Préserve les fichiers non suivis (`=ro`, `opencode.json`). Ne lance ni Docker, ni n8n, ni PostgreSQL, ni Ollama, ni accès réseau sans mon accord.
 
 ### 15.4 Prompt type pour un lot d'implémentation
 

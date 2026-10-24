@@ -1,0 +1,175 @@
+=== git status --short ===
+ M backend/src/main/java/com/adgendoc/api/ExtractionController.java
+ M backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
+ M docs/PRD_adgendoc_v2_1_Cursor.md
+?? docs/reports/D0-prd-v2.2.md
+?? docs/reports/evidence/D0-diff-commit.txt
+?? docs/reports/evidence/D0-diff-docs.txt
+?? docs/reports/evidence/D0-diff-final.txt
+?? docs/reports/evidence/D0-log.txt
+?? docs/reports/evidence/D0-status.txt
+?? docs/reports/evidence/LA-extraction-controller-test.txt
+
+=== git diff (lot files) ===
+git : warning: LF will be replaced by CRLF in backend/src/main/java/com/adgendoc/api/ExtractionController.java.
+Au caractère Ligne:1 : 116
++ ... ; $diff1 = (git diff -- "backend/src/main/java/com/adgendoc/api/Extra ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: LF wil...ontroller.java.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java.
+The file will have its original line endings in your working directory
+diff --git a/backend/src/main/java/com/adgendoc/api/ExtractionController.java b/backend/src/main/java/com/adgendoc/api/ExtractionController.java
+index 0617348..f3687b2 100644
+--- a/backend/src/main/java/com/adgendoc/api/ExtractionController.java
++++ b/backend/src/main/java/com/adgendoc/api/ExtractionController.java
+@@ -5,7 +5,9 @@ import com.adgendoc.api.dto.ExtractionValidationResponse;
+ import com.adgendoc.application.ExtractionValidationService;
+ import com.adgendoc.infrastructure.config.CorrelationIdFilter;
+ import jakarta.servlet.http.HttpServletRequest;
++import org.springframework.http.MediaType;
+ import org.springframework.http.ResponseEntity;
++import org.springframework.web.HttpMediaTypeNotSupportedException;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
+ import org.springframework.web.bind.annotation.RequestMapping;
+@@ -28,9 +30,11 @@ public class ExtractionController {
+         this.extractionValidationService = extractionValidationService;
+     }
+ 
+-    @PostMapping("/validate")
++    @PostMapping(value = "/validate", consumes = MediaType.APPLICATION_JSON_VALUE)
+     public ResponseEntity<ExtractionValidationResponse> validate(
+-            @RequestBody String rawBody, HttpServletRequest http) {
++            @RequestBody String rawBody, HttpServletRequest http)
++            throws HttpMediaTypeNotSupportedException {
++        rejectNonUtf8Charset(http);
+         List<ExtractionValidationService.SchemaViolation> violations =
+                 extractionValidationService.validate(rawBody);
+         boolean valid = violations.isEmpty();
+@@ -42,4 +46,24 @@ public class ExtractionController {
+                 valid, CorrelationIdFilter.currentCorrelationId(http), errors);
+         return valid ? ResponseEntity.ok(body) : ResponseEntity.badRequest().body(body);
+     }
++
++    /**
++     * {@code consumes = application/json} laisse passer tout charset : la
++     * compatibilité Spring ne compare pas ce paramètre. D2 n'accepte que
++     * l'absence de charset ou UTF-8 ; le rejet réutilise
++     * {@code HttpMediaTypeNotSupportedException} (même advice que E1/E3).
++     */
++    private static void rejectNonUtf8Charset(HttpServletRequest http)
++            throws HttpMediaTypeNotSupportedException {
++        String raw = http.getContentType();
++        if (raw == null || raw.isBlank()) {
++            return;
++        }
++        MediaType mediaType = MediaType.parseMediaType(raw);
++        String charset = mediaType.getParameter("charset");
++        if (charset != null && !"UTF-8".equalsIgnoreCase(charset)) {
++            throw new HttpMediaTypeNotSupportedException(
++                    mediaType, List.of(MediaType.APPLICATION_JSON));
++        }
++    }
+ }
+diff --git a/backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java b/backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
+index 07e019b..3a70540 100644
+--- a/backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
++++ b/backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
+@@ -1,14 +1,18 @@
+ package com.adgendoc.api;
+ 
+ import com.adgendoc.application.ExtractionValidationService;
++import com.adgendoc.application.RequestService;
+ import com.adgendoc.infrastructure.config.CorrelationIdFilter;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.Test;
+ import org.springframework.http.MediaType;
+ import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.ResultActions;
++import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+ 
+ import static org.hamcrest.Matchers.containsString;
++import static org.mockito.Mockito.mock;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+@@ -28,6 +32,7 @@ class ExtractionControllerTest {
+         ExtractionValidationService service = new ExtractionValidationService(
+                 "classpath:prompts/extraction/attestation_concordance.schema.json");
+         mockMvc = MockMvcBuilders.standaloneSetup(new ExtractionController(service))
++                .setControllerAdvice(new GlobalExceptionHandler(mock(RequestService.class)))
+                 .addFilters(new CorrelationIdFilter())
+                 .build();
+     }
+@@ -148,6 +153,49 @@ class ExtractionControllerTest {
+                 .andExpect(jsonPath("$.errors[0].code").value("ERR_PAYLOAD_INVALIDE"));
+     }
+ 
++    @Test
++    void e8_text_plain_content_type_returns_400_validation_error() throws Exception {
++        expectContentTypeRejected(post("/api/v1/extraction/validate")
++                .contentType(MediaType.TEXT_PLAIN));
++    }
++
++    @Test
++    void e8_form_urlencoded_content_type_returns_400_validation_error() throws Exception {
++        expectContentTypeRejected(post("/api/v1/extraction/validate")
++                .contentType(MediaType.APPLICATION_FORM_URLENCODED));
++    }
++
++    @Test
++    void e8_missing_content_type_returns_400_validation_error() throws Exception {
++        expectContentTypeRejected(post("/api/v1/extraction/validate"));
++    }
++
++    @Test
++    void e8_json_charset_iso_8859_1_returns_400_validation_error() throws Exception {
++        expectContentTypeRejected(post("/api/v1/extraction/validate")
++                .contentType("application/json; charset=ISO-8859-1"));
++    }
++
++    @Test
++    void e8_json_without_charset_is_accepted() throws Exception {
++        mockMvc.perform(post("/api/v1/extraction/validate")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(validComplete()))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.valid").value(true))
++                .andExpect(jsonPath("$.code").doesNotExist());
++    }
++
++    @Test
++    void e8_json_charset_utf8_is_accepted() throws Exception {
++        mockMvc.perform(post("/api/v1/extraction/validate")
++                        .contentType("application/json; charset=UTF-8")
++                        .content(validComplete()))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.valid").value(true))
++                .andExpect(jsonPath("$.code").doesNotExist());
++    }
++
+     @Test
+     void e8_correlation_id_is_echoed() throws Exception {
+         mockMvc.perform(post("/api/v1/extraction/validate")
+@@ -159,6 +207,17 @@ class ExtractionControllerTest {
+                 .andExpect(jsonPath("$.correlationId").value("n8n-trace-42"));
+     }
+ 
++    private void expectContentTypeRejected(MockHttpServletRequestBuilder request) throws Exception {
++        ResultActions result = mockMvc.perform(request.content(validComplete()));
++        result.andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
++                .andExpect(jsonPath("$.correlationId").isNotEmpty())
++                .andExpect(jsonPath("$.missingFields").isArray())
++                .andExpect(jsonPath("$.valid").doesNotExist())
++                .andExpect(jsonPath("$.fieldErrors[0].field").value("payload"))
++                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"));
++    }
++
+     private String validComplete() {
+         return """
+                 {"documentType":"ATTESTATION_CONCORDANCE","confidence":0.97,
