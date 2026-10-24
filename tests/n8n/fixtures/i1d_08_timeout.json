@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "I1D-08",
+  "gate": "I-D",
+  "caseNumber": 8,
+  "caseKey": "timeout",
+  "title": "Timeout simulé",
+  "description": "Le stub Ollama ne répond pas avant la borne simulée, trois fois ; aucun appel backend ne doit être émis et le workflow doit retourner 502 AI_EXTRACTION_ERROR.",
+  "synthetic": true,
+  "input": {
+    "method": "POST",
+    "path": "/webhook/document-generation",
+    "correlationId": "88888888-8888-4888-8888-888888888888",
+    "events": [
+      {
+        "sequence": 1,
+        "body": {
+          "message": "Génère une attestation de concordance pour Camille Fictive, née le 01/01/1980 à Ville-Fictive.",
+          "requestId": null
+        }
+      }
+    ]
+  },
+  "stubs": [
+    {
+      "stage": "OLLAMA",
+      "mode": "timeout",
+      "httpStatus": null,
+      "delayMs": 60000,
+      "body": null
+    },
+    {
+      "stage": "OLLAMA",
+      "mode": "timeout",
+      "httpStatus": null,
+      "delayMs": 60000,
+      "body": null
+    },
+    {
+      "stage": "OLLAMA",
+      "mode": "timeout",
+      "httpStatus": null,
+      "delayMs": 60000,
+      "body": null
+    }
+  ],
+  "expected": {
+    "finalHttpStatus": 502,
+    "finalOutcome": "ERROR",
+    "errorCode": "AI_EXTRACTION_ERROR",
+    "requestId": null,
+    "documentId": null,
+    "missingFields": [],
+    "calls": {
+      "OLLAMA": 3,
+      "E8": 0,
+      "E1": 0,
+      "E2": 0,
+      "E3": 0,
+      "E4": 0,
+      "E5": 0,
+      "E6": 0
+    },
+    "idempotency": null,
+    "securityScan": {
+      "piiInLogs": false,
+      "binaryInExecutionData": false
+    }
+  },
+  "securityProbe": null
+}

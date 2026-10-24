@@ -1,0 +1,304 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "*": "deny",
+    "read": {
+      "*": "deny",
+      "AGENTS.md": "allow",
+      "requirements/N8N_CONTRACTS.md": "allow",
+      "requirements\\N8N_CONTRACTS.md": "allow",
+      "requirements/ATTESTATION_CONCORDANCE.md": "allow",
+      "requirements\\ATTESTATION_CONCORDANCE.md": "allow",
+      "requirements/API_CONTRACTS.md": "allow",
+      "requirements\\API_CONTRACTS.md": "allow",
+      "docs/n8n-orchestration.md": "allow",
+      "docs\\n8n-orchestration.md": "allow",
+      "tests/n8n": "allow",
+      "tests\\n8n": "allow",
+      "tests/n8n/FIXTURES_I1.md": "allow",
+      "tests\\n8n\\FIXTURES_I1.md": "allow",
+      "tests/n8n/validate_i1_fixtures.ps1": "allow",
+      "tests\\n8n\\validate_i1_fixtures.ps1": "allow",
+      "tests/n8n/fixtures": "allow",
+      "tests\\n8n\\fixtures": "allow",
+      "tests/n8n/fixtures/*": "allow",
+      "tests\\n8n\\fixtures\\*": "allow",
+      "tests/n8n/fixtures/**": "allow",
+      "tests\\n8n\\fixtures\\**": "allow",
+      "tests/fixtures": "allow",
+      "tests\\fixtures": "allow",
+      "tests/fixtures/*": "allow",
+      "tests\\fixtures\\*": "allow",
+      "tests/fixtures/**": "allow",
+      "tests\\fixtures\\**": "allow",
+      "**/backup/**": "deny",
+      "**/backups/**": "deny",
+      "**/*.bak": "deny",
+      "**/*.dump": "deny",
+      "**/*.sql": "deny",
+      "**/*.sql.gz": "deny",
+      "**/.env": "deny",
+      "**/.env.*": "deny",
+      "**/*.pem": "deny",
+      "**/*.key": "deny",
+      "**/*.p12": "deny",
+      "**/*.jks": "deny",
+      "**/secrets/**": "deny",
+      "**/pii/**": "deny",
+      "**/personal-data/**": "deny",
+      "**/donnees-personnelles/**": "deny",
+      "**/*.log": "deny",
+      "**/logs/**": "deny"
+    },
+    "external_directory": "deny"
+  },
+  "agent": {
+    "orchestrator": {
+      "tools": {
+        "edit": false,
+        "write": false,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": true,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "task": {
+          "*": "deny",
+          "backend-developer": "allow",
+          "tester": "allow",
+          "reviewer": "allow",
+          "security": "allow"
+        }
+      }
+    },
+    "backend-developer": {
+      "tools": {
+        "edit": true,
+        "write": true,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "edit": {
+          "*": "deny",
+          "tests/n8n/FIXTURES_I1.md": "allow",
+          "tests\\n8n\\FIXTURES_I1.md": "allow",
+          "tests/n8n/fixtures/*": "allow",
+          "tests\\n8n\\fixtures\\*": "allow",
+          "tests/n8n/fixtures/**": "allow",
+          "tests\\n8n\\fixtures\\**": "allow"
+        }
+      }
+    },
+    "tester": {
+      "tools": {
+        "edit": false,
+        "write": false,
+        "bash": true,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "bash": {
+          "*": "deny",
+          "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\n8n\\validate_i1_fixtures.ps1": "allow",
+          "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\n8n\\validate_i1_fixtures.ps1 -SelfTest": "allow"
+        }
+      }
+    },
+    "reviewer": {
+      "tools": {
+        "edit": false,
+        "write": false,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      }
+    },
+    "security": {
+      "tools": {
+        "edit": false,
+        "write": false,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      }
+    },
+    "validator-maintainer": {
+      "description": "Modifies only the approved fixture validator, on explicit human authorization.",
+      "mode": "subagent",
+      "prompt": "You are the controlled validator maintainer. You may modify ONLY tests/n8n/validate_i1_fixtures.ps1. You must not modify fixtures, application code, workflows, database, Docker, prompts, or any other file. You must not run shell commands or delegate. Before modifying, require an explicit human instruction naming the validator change. If the instruction is ambiguous, stop and report BLOCKED. Report the exact change and the verification performed.",
+      "tools": {
+        "edit": true,
+        "write": true,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "edit": {
+          "*": "deny",
+          "tests/n8n/validate_i1_fixtures.ps1": "allow",
+          "tests\\n8n\\validate_i1_fixtures.ps1": "allow"
+        }
+      }
+    },
+    "business-analyst": {
+      "tools": {
+        "read": true,
+        "edit": false,
+        "write": false,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "read": {
+          "*": "deny",
+          "requirements/N8N_CONTRACTS.md": "allow",
+          "requirements\\N8N_CONTRACTS.md": "allow",
+          "docs/n8n-orchestration.md": "allow",
+          "docs\\n8n-orchestration.md": "allow",
+          "tests/n8n/FIXTURES_I1.md": "allow",
+          "tests\\n8n\\FIXTURES_I1.md": "allow",
+          "tests/n8n/fixtures": "allow",
+          "tests\\n8n\\fixtures": "allow",
+          "tests/n8n/fixtures/*": "allow",
+          "tests\\n8n\\fixtures\\*": "allow",
+          "tests/n8n/fixtures/**": "allow",
+          "tests\\n8n\\fixtures\\**": "allow"
+        }
+      }
+    },
+    "architect": {
+      "tools": {
+        "read": false,
+        "edit": false,
+        "write": false,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "read": "deny"
+      }
+    },
+    "ai-engineer": {
+      "tools": {
+        "read": false,
+        "edit": false,
+        "write": false,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "read": "deny"
+      }
+    },
+    "database-engineer": {
+      "tools": {
+        "read": false,
+        "edit": false,
+        "write": false,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "read": "deny"
+      }
+    },
+    "n8n-developer": {
+      "tools": {
+        "read": false,
+        "edit": false,
+        "write": false,
+        "bash": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "webfetch": false,
+        "websearch": false,
+        "todowrite": false,
+        "skill": false,
+        "lsp": false
+      },
+      "permission": {
+        "read": "deny"
+      }
+    }
+  }
+}

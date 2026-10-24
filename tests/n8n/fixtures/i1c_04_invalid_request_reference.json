@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "I1C-04",
+  "gate": "I-C",
+  "caseNumber": 4,
+  "caseKey": "invalid_request_reference",
+  "title": "Référence de demande invalide",
+  "description": "Le requestId fourni ne respecte pas le format UUID v4 ; le workflow doit rejeter l'ingress sans appel backend.",
+  "synthetic": true,
+  "input": {
+    "method": "POST",
+    "path": "/webhook/document-generation",
+    "correlationId": "44444444-4444-4444-8444-444444444444",
+    "events": [
+      {
+        "sequence": 1,
+        "body": {
+          "message": "Complément fictif avec une référence de demande volontairement invalide.",
+          "requestId": "ref-invalide-001"
+        }
+      }
+    ]
+  },
+  "stubs": [],
+  "expected": {
+    "finalHttpStatus": 400,
+    "finalOutcome": "INVALID_REQUEST",
+    "errorCode": "VALIDATION_ERROR",
+    "requestId": null,
+    "documentId": null,
+    "missingFields": [],
+    "calls": {
+      "OLLAMA": 0,
+      "E8": 0,
+      "E1": 0,
+      "E2": 0,
+      "E3": 0,
+      "E4": 0,
+      "E5": 0,
+      "E6": 0
+    },
+    "idempotency": null,
+    "securityScan": {
+      "piiInLogs": false,
+      "binaryInExecutionData": false
+    }
+  },
+  "securityProbe": null
+}

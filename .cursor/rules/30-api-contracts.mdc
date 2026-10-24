@@ -1,0 +1,18 @@
+---
+description: Respect des contrats API
+globs: **/api/**,**/web/**,requirements/**,**/openapi*
+alwaysApply: false
+---
+
+- Les 8 endpoints, schémas et statuts viennent de requirements/API_CONTRACTS.md : ne pas redessiner.
+- Tout changement de contrat exige un ADR et un accord explicite ; sinon changement additif et rétrocompatible uniquement.
+- Erreurs : un seul format, `ErrorResponse` (code, message FR, correlationId, missingFields[], requestId?, status?, fieldErrors[]). Pas de ProblemDetail. Conserver les codes ERR_* existants.
+- Statuts : DRAFT, MISSING_INFORMATION, VALIDATED, REJECTED (terminal), GENERATED (terminal), FAILED. Ne pas en inventer (REQUIRES_BUSINESS_VALIDATION n'existe pas).
+- Endpoints E1–E8 sous /api/v1 ; X-Correlation-Id propagé et renvoyé ; corps max 65 536 octets (413).
+- It.1 sans authentification : ne pas ajouter de Spring Security sans ADR ; JWT = it.2.
+- Le LLM (Ollama) est appelé par n8n, pas par le backend. Contrat webhook : requirements/N8N_CONTRACTS.md (200 = résultat métier, jamais de 409 relayé, jamais de binaire).
+- Si un contrat est ambigu ou contradictoire (cf. PRD §12.3), le signaler et s'arrêter ; ne pas trancher seul.
+- Dates canoniques ISO yyyy-MM-dd ; dd/MM/yyyy réservé aux entrées/présentations prévues par le contrat.
+- Les clés JSON inconnues sont rejetées, pas ignorées.
+- Idempotence : suivre la règle du contrat ; ne jamais produire deux documents pour une même demande dupliquée.
+- Maintenir openapi.yaml synchronisé avec le contrat et couvert par des tests.

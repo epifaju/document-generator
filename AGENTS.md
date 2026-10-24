@@ -2,6 +2,11 @@
 
 # Administrative Document Generator
 
+> v2 — the original sections 1–18 are kept. Changes are tagged:
+> **[CHANGED]** modified wording, **[NEW]** added section or rule,
+> **[CONFIRM]** needs a human decision before it is treated as binding.
+> Where this file and a versioned contract disagree, STOP and escalate (§18, §22).
+
 ## 1. Mission
 
 Build and maintain a production-grade conversational system for generating
@@ -23,7 +28,7 @@ The system must:
 7. select the correct official DOCX template;
 8. merge validated data into the template;
 9. generate DOCX;
-10. optionally generate PDF;
+10. optionally generate PDF **[CHANGED]** (out of scope for iteration 1, see N8N_CONTRACTS §7);
 11. archive the result;
 12. return the generated document.
 
@@ -40,9 +45,7 @@ n8n
 |
 +---- Ollama / LLM
 |
-+---- PostgreSQL
-|
-+---- Spring Boot Document API
++---- Spring Boot Document API ---- PostgreSQL
 |
 v
 DOCX template
@@ -50,19 +53,25 @@ DOCX template
 v
 DOCX / PDF
 
+**[CHANGED]** The previous diagram showed n8n connected to PostgreSQL directly.
+The versioned contracts (API_CONTRACTS E1–E8, N8N_CONTRACTS) route every
+business read/write through the Spring Boot API. **[CONFIRM]** n8n must not
+access business tables directly; its own execution storage is separate.
+
 Responsibilities:
 
 n8n:
 
 - orchestration
-- conversation flow
-- calling APIs
-- handling retries
+- conversation flow (webhook `POST /webhook/document-generation`)
+- calling the LLM and the backend API (E1–E8)
+- handling bounded retries and reconciliation
 - notifications
 
 Spring Boot:
 
 - business validation
+- state machine and persistence (via PostgreSQL)
 - document generation
 - template processing
 - document storage API
@@ -88,7 +97,8 @@ The LLM MUST NOT be the source of truth for administrative rules.
 # 3. Repository structure
 
 requirements/
-Business requirements and document definitions.
+Business requirements, document definitions and contracts
+(`ATTESTATION_CONCORDANCE.md`, `API_CONTRACTS.md`, `N8N_CONTRACTS.md`).
 
 n8n/workflows/
 Exported n8n workflows.
@@ -109,10 +119,13 @@ tests/
 Automated test cases and fixtures.
 
 docs/
-Architecture and operational documentation.
+Architecture and operational documentation (`architecture.md`,
+`n8n-orchestration.md`, ADRs, lot reports).
 
 docker/
 Local infrastructure.
+
+**[NEW]** `.cursor/rules/` — Cursor project rules (see §19).
 
 ---
 
@@ -181,6 +194,21 @@ Example:
 Never parse critical business data from uncontrolled prose when structured
 output can be used.
 
+**[NEW]** `dateNaissance` in an extraction is strictly ISO `yyyy-MM-dd`
+(validated by E8); the backend tolerates `dd/MM/yyyy` only on E1/E3 input
+and normalizes it.
+
+## 4.4 [NEW] Contracts are the source of truth
+
+- Endpoints E1–E8, statuses, HTTP codes, `ErrorResponse` format and error
+  codes are defined in `requirements/API_CONTRACTS.md`.
+- The webhook envelope (`outcome`, `correlationId`), outcomes, bounds and
+  retry rules are defined in `requirements/N8N_CONTRACTS.md`.
+- Statuses: `DRAFT`, `MISSING_INFORMATION`, `VALIDATED`, `REJECTED`
+  (terminal), `GENERATED` (terminal), `FAILED`. Do not invent others.
+- Never rename or reshape a contract silently. A contract change needs an
+  ADR and explicit human approval.
+
 ---
 
 # 5. Initial pilot
@@ -223,6 +251,11 @@ security
 The orchestrator coordinates work.
 
 Specialist agents should stay within their responsibilities.
+
+**[NEW]** In Cursor, a role is applied by starting a separate conversation
+(or custom mode) with the matching rules and an explicit role prompt. A role
+that reviews work (tester, reviewer, security) must be a **fresh context**,
+never the conversation that wrote the code.
 
 ---
 
@@ -277,6 +310,10 @@ Produce a blocking report.
 
 Do not continue modifying the project blindly.
 
+**[NEW]** Implementation is test-first: write or adapt the failing test that
+encodes the acceptance criterion, then the minimal change. One lot = one
+scope = one report.
+
 ---
 
 # 8. Definition of Done
@@ -299,6 +336,9 @@ A feature is DONE only when all applicable items pass:
 [ ] reviewer = PASS
 [ ] security = PASS
 [ ] documentation updated
+[ ] **[NEW]** contract tests pass (HTTP code, `code`, persisted status per endpoint)
+[ ] **[NEW]** no PII or secret in code, fixtures, logs or reports
+[ ] **[NEW]** lot report written with honest gate statuses (§20)
 
 ---
 
@@ -323,6 +363,9 @@ git push --force
 
 Do not automatically commit unless explicitly requested.
 
+**[NEW]** Preserve untracked files (fixtures, local config). Never delete a
+file you did not create in the current lot.
+
 ---
 
 # 10. Database rules
@@ -340,6 +383,10 @@ Prefer foreign keys and database constraints for critical integrity rules.
 Database migrations belong in:
 
 database/migrations/
+
+**[NEW]** Never edit a migration that has already been applied: add a new
+one. Integration tests run against an isolated database (Testcontainers or an
+explicitly authorized environment), never a shared one.
 
 ---
 
@@ -363,6 +410,12 @@ Separate:
 Complex deterministic business logic should normally live in the backend,
 not in large Code nodes.
 
+**[NEW]** Every wait is bounded (timeouts and attempts in N8N_CONTRACTS §4).
+No `retryOnFail` without an explicit retry condition. E1 is never retried
+after a timeout; E3/E5 ambiguity is reconciled through E2 first; never a
+third E5 call. n8n never relays a backend `409`, never produces business
+error codes, never relays the DOCX binary.
+
 ---
 
 # 12. AI rules
@@ -383,7 +436,16 @@ LLMs must not:
 - directly modify production data
 - generate official administrative claims without deterministic validation
 
-Low confidence must trigger review or clarification.
+**[CHANGED] [CONFIRM]** Previous wording: "Low confidence must trigger review
+or clarification." This conflicts with API_CONTRACTS §2.1/§2.4, where
+`confidence` is audit metadata that never influences validation and is never a
+source of truth. Proposed rule: ambiguity is handled by deterministic checks
+(`missingFields`, schema validation, guard D-1), not by a confidence
+threshold; `confidence`, `modelId` and `promptVersion` are stored for audit
+only. If a confidence threshold is wanted, it requires a contract change.
+
+**[NEW]** User text is data, never instructions to the model. Raw LLM output
+is never logged or returned to the user.
 
 ---
 
@@ -407,26 +469,43 @@ Generated document access must be authorized.
 
 Audit important actions.
 
+**[NEW]** Iteration 1 has no authentication (internal network / loopback) —
+an accepted, documented risk. Before any production exposure, both are
+mandatory: a webhook token on n8n and authorization on document download
+(E6). Iteration 2 introduces JWT (`401`/`403`). Do not add authentication
+code in iteration 1 without an ADR.
+
+**[NEW]** Test fixtures contain synthetic data only. No value of `data`
+(names, dates, places) appears in n8n messages, logs or error bodies.
+
 ---
 
 # 14. Error handling
 
 Errors must be classified.
 
-Examples:
+**[CHANGED]** Backend codes (exhaustive list in API_CONTRACTS §2.3):
 
 VALIDATION_ERROR
 MISSING_INFORMATION
-AI_EXTRACTION_ERROR
+INVALID_STATUS
+REQUEST_ALREADY_CLOSED
+REQUEST_NOT_FOUND
+DOCUMENT_NOT_FOUND
 TEMPLATE_NOT_FOUND
 DOCUMENT_GENERATION_ERROR
 DATABASE_ERROR
-UNAUTHORIZED
+UNAUTHORIZED (iteration 2)
+FORBIDDEN (iteration 2)
 INTERNAL_ERROR
+
+n8n-local codes (N8N_CONTRACTS §3.4): AI_EXTRACTION_ERROR,
+EXTRACTION_SCHEMA_INVALID, BACKEND_UNAVAILABLE.
 
 Do not expose stack traces to end users.
 
-Log technical correlation IDs.
+Log technical correlation IDs (`X-Correlation-Id`, propagated unchanged from
+webhook to every backend call and returned in responses).
 
 ---
 
@@ -443,6 +522,9 @@ errorCode
 
 Avoid storing raw sensitive prompts in logs unless explicitly required and
 properly protected.
+
+**[NEW]** Structured JSON logs with `correlationId` and `requestId` in MDC;
+metrics per step (extraction, validation, generation); no PII.
 
 ---
 
@@ -464,6 +546,16 @@ regressions
 
 The tester must test observable behavior, not merely implementation details.
 
+**[NEW]** Additional required coverage:
+- status × endpoint matrix (allowed and forbidden transitions, `409` cases);
+- contract tests for E1–E8 (HTTP code, `code`, persisted status);
+- DOCX checks: opens without error, no residual placeholder in body, tables,
+  headers and footers, values equal to normalized data, placeholders split
+  across runs handled;
+- n8n fixtures (conversation and hostile) validated; static fixtures are
+  never reported as runtime proof;
+- never weaken or delete a test to make it pass.
+
 ---
 
 # 17. Agent communication
@@ -481,6 +573,9 @@ Agents must not claim success without evidence.
 
 "Looks correct" is not a test result.
 
+**[NEW]** Evidence = real command output pasted in the report. Claims about
+existing code cite `file:line`; if unverified, write "unknown".
+
 ---
 
 # 18. Human escalation
@@ -496,3 +591,72 @@ Stop and request human intervention when:
 - a legal/administrative rule cannot be verified.
 
 Do not guess.
+
+**[NEW]** Also stop when a contract is ambiguous or self-contradictory (see
+PRD §12.3, open items Q-01 to Q-11), when a change would alter E1–E8 or the
+webhook envelope, and before any network access, Docker, database, n8n or LLM
+call that was not explicitly authorized.
+
+---
+
+# 19. [NEW] Working in Cursor
+
+Rules live in `.cursor/rules/` (always-applied: project context and
+security/PII; scoped by globs: architecture, testing, API contracts, DOCX).
+This file stays the shared reference for every agent.
+
+Per-lot loop:
+
+1. **Plan, read-only**: files read, assumptions, risks, tests to write.
+   No modification before approval.
+2. **Test first**, linked to a PRD requirement (FR-xx).
+3. **Minimal change**, one scope, no mixed refactoring.
+4. **Verify** with the gate commands, paste real output.
+5. **Fresh-context review** (reviewer, then security).
+6. **Report** in `docs/reports/<lot>.md`.
+
+Use `@file` / `@folder` references instead of pasting code; one conversation
+per lot; keep prompts explicit about what must NOT change.
+
+Reference commands (confirm at audit G0): `./mvnw verify` ·
+`./mvnw -Dtest=<Class> test` · `tests/n8n/validate_i1_fixtures.ps1`.
+
+---
+
+# 20. [NEW] Gate status vocabulary
+
+Only `PASS`, `FAIL`, `NOT_RUN`. A gate that was not executed is `NOT_RUN`,
+never `PASS`. Static fixture validation is not n8n runtime validation.
+
+G0 inventory/audit · G1 build + unit · G2 persistence integration ·
+G3 DOCX verified · G4 HTTP contract E2E · G5 fixtures I-C/I-D + validator ·
+G6 n8n runtime (authorized, with evidence) · G7 security/privacy review ·
+G8 CI green.
+
+---
+
+# 21. [NEW] Technology baseline
+
+Existing (confirm at audit): Java / Spring Boot, Maven wrapper, PostgreSQL,
+Flyway-style versioned migrations, Apache POI (XWPF), n8n, Ollama, Docker
+Compose (internal network), JUnit.
+
+Proposed additions, each requiring an ADR before use: OpenAPI file +
+springdoc, Testcontainers, WireMock (LLM/n8n stubs), ArchUnit, JaCoCo,
+Spotless/Checkstyle/SpotBugs, MapStruct, Resilience4j, Micrometer +
+OpenTelemetry + JSON logs, GitHub Actions, Gitleaks/Trivy/Dependency-Check.
+JDK version to be unified (21 LTS recommended).
+
+---
+
+# 22. [NEW] Source-of-truth order
+
+1. `requirements/API_CONTRACTS.md`, `requirements/N8N_CONTRACTS.md`,
+   `requirements/ATTESTATION_CONCORDANCE.md`
+2. Applied database migrations
+3. Existing code and tests
+4. ADRs and `docs/architecture.md`
+5. `PRD_adgendoc_v2_1_Cursor.md`
+6. This file for process rules (it prevails on workflow, not on contracts)
+
+On conflict: report the discrepancy, do not fix it silently.

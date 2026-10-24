@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "I1D-10",
+  "gate": "I-D",
+  "caseNumber": 10,
+  "caseKey": "binary_content",
+  "title": "Présence de contenu binaire simulé",
+  "description": "Le fixture porte une signature ZIP synthétique encodée en base64 pour préparer le scan des données d'exécution ; aucun binaire réel n'est inclus.",
+  "synthetic": true,
+  "input": {
+    "method": "POST",
+    "path": "/webhook/document-generation",
+    "correlationId": "12121212-1212-4212-8212-121212121212",
+    "events": [
+      {
+        "sequence": 1,
+        "body": {
+          "message": "Génère une attestation de concordance pour Camille Fictive, née le 01/01/1980 à Ville-Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
+          "requestId": null
+        }
+      }
+    ]
+  },
+  "stubs": [
+    {
+      "stage": "OLLAMA",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentType": "ATTESTATION_CONCORDANCE",
+        "confidence": 0.97,
+        "data": {
+          "prenom": "Camille",
+          "nom": "Fictive",
+          "dateNaissance": "1980-01-01",
+          "lieuNaissance": "Ville-Fictive",
+          "nomIncorrect": "Camil Fictif",
+          "nomCorrect": "Camille Fictive"
+        },
+        "missingFields": []
+      }
+    },
+    {
+      "stage": "E8",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "valid": true
+      }
+    },
+    {
+      "stage": "E1",
+      "mode": "success",
+      "httpStatus": 201,
+      "delayMs": 0,
+      "body": {
+        "status": "VALIDATED",
+        "requestId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        "missingFields": []
+      }
+    },
+    {
+      "stage": "E4",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "status": "VALIDATED"
+      }
+    },
+    {
+      "stage": "E5",
+      "mode": "success",
+      "httpStatus": 201,
+      "delayMs": 0,
+      "body": {
+        "status": "GENERATED",
+        "documentId": "12121212-1212-4212-8212-121212121212",
+        "documentBase64": "UEsDBA=="
+      }
+    },
+    {
+      "stage": "E6",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentId": "12121212-1212-4212-8212-121212121212"
+      }
+    }
+  ],
+  "expected": {
+    "finalHttpStatus": 200,
+    "finalOutcome": "GENERATED",
+    "errorCode": null,
+    "requestId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "documentId": "12121212-1212-4212-8212-121212121212",
+    "missingFields": [],
+    "calls": {
+      "OLLAMA": 1,
+      "E8": 1,
+      "E1": 1,
+      "E2": 0,
+      "E3": 0,
+      "E4": 1,
+      "E5": 1,
+      "E6": 1
+    },
+    "idempotency": null,
+    "securityScan": {
+      "piiInLogs": false,
+      "binaryInExecutionData": false
+    }
+  },
+  "securityProbe": {
+    "kind": "binary",
+    "base64": "UEsDBA==",
+    "expectedMagicHex": "504B0304",
+    "note": "Signature ZIP synthetique encodee en base64 ; aucun fichier binaire reel."
+  }
+}

@@ -1,0 +1,15 @@
+---
+description: Architecture hexagonale et dépendances autorisées
+globs: backend/src/main/java/**
+alwaysApply: false
+---
+
+- Respecter les packages/ports/adapters existants avant d'en créer de nouveaux.
+- `domain` : aucune dépendance à Spring, JPA, Apache POI, client IA ou HTTP.
+- `application` : orchestre via des ports (ExtractionPort, RequestRepository, TemplateRenderer, DocumentStorage).
+- `adapter` : implémente les ports ; c'est le seul endroit où vivent POI, JPA, clients externes.
+- Les contrôleurs ne contiennent aucune logique métier : ils mappent DTO ↔ commande et délèguent.
+- Les transitions d'état (T1–T14, cf. PRD §8) passent exclusivement par RequestStateMachine et écrivent un AuditEvent dans la même transaction.
+- Constructeur d'injection uniquement ; pas d'injection par champ.
+- Toute nouvelle dépendance Maven nécessite une justification (ADR ou note dans le rapport de lot).
+- Toute violation doit être détectable par un test ArchUnit.

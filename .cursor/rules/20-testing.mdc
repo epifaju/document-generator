@@ -1,0 +1,15 @@
+---
+description: Conventions de tests
+globs: backend/src/test/**
+alwaysApply: false
+---
+
+- JUnit 5 + AssertJ. Nommage : `methode_condition_resultatAttendu`.
+- Écrire d'abord le test qui échoue, lié à un identifiant FR-xx du PRD.
+- Unitaires : aucun I/O, aucun appel IA ; domaine et validation couverts (dates, champs obligatoires, clés inconnues, règles métier).
+- Intégration : Testcontainers PostgreSQL (jamais une base partagée) ; Flyway appliqué.
+- IA et n8n : stubs/WireMock, jamais d'appel réel en CI.
+- Fixtures 100 % synthétiques : aucune donnée personnelle réelle.
+- Tests paramétrés pour le mapping endpoint × scénario → HTTP → code → statut (PRD §12.1) et outcome n8n → HTTP (§12.2).
+- Vérification DOCX : ouverture POI, extraction du texte (corps, tableaux, en-têtes/pieds), absence de motif de placeholder résiduel, comparaison avec les valeurs normalisées.
+- Ne jamais affaiblir ou supprimer un test pour le faire passer ; signaler plutôt l'écart.

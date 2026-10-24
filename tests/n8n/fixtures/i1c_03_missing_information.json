@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "I1C-03",
+  "gate": "I-C",
+  "caseNumber": 3,
+  "caseKey": "missing_information",
+  "title": "Informations manquantes",
+  "description": "L'extraction détecte deux champs obligatoires absents ; E1 renvoie 422 et le workflow expose MISSING_INFORMATION sans inventer de valeur.",
+  "synthetic": true,
+  "input": {
+    "method": "POST",
+    "path": "/webhook/document-generation",
+    "correlationId": "33333333-3333-4333-8333-333333333333",
+    "events": [
+      {
+        "sequence": 1,
+        "body": {
+          "message": "Génère une attestation de concordance pour Camille Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
+          "requestId": null
+        }
+      }
+    ]
+  },
+  "stubs": [
+    {
+      "stage": "OLLAMA",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentType": "ATTESTATION_CONCORDANCE",
+        "confidence": 0.93,
+        "data": {
+          "prenom": "Camille",
+          "nom": "Fictive",
+          "nomIncorrect": "Camil Fictif",
+          "nomCorrect": "Camille Fictive"
+        },
+        "missingFields": ["dateNaissance", "lieuNaissance"]
+      }
+    },
+    {
+      "stage": "E8",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "valid": true
+      }
+    },
+    {
+      "stage": "E1",
+      "mode": "error",
+      "httpStatus": 422,
+      "delayMs": 0,
+      "body": {
+        "code": "MISSING_INFORMATION",
+        "status": "MISSING_INFORMATION",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": ["dateNaissance", "lieuNaissance"]
+      }
+    }
+  ],
+  "expected": {
+    "finalHttpStatus": 200,
+    "finalOutcome": "MISSING_INFORMATION",
+    "errorCode": null,
+    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "documentId": null,
+    "missingFields": ["dateNaissance", "lieuNaissance"],
+    "calls": {
+      "OLLAMA": 1,
+      "E8": 1,
+      "E1": 1,
+      "E2": 0,
+      "E3": 0,
+      "E4": 0,
+      "E5": 0,
+      "E6": 0
+    },
+    "idempotency": null,
+    "securityScan": {
+      "piiInLogs": false,
+      "binaryInExecutionData": false
+    }
+  },
+  "securityProbe": null
+}

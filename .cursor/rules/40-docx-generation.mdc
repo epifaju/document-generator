@@ -1,0 +1,12 @@
+---
+description: Génération DOCX et templates
+globs: **/docx/**,**/template*/**,templates/**
+alwaysApply: false
+---
+
+- Template : templates/attestation_concordance_v1.docx ; ne jamais le modifier sans nouvelle version (v2) et mise à jour de l'empreinte SHA-256.
+- Placeholders attendus (14) : prenom, nom, date_naissance, lieu_naissance, nom_incorrect, nom_correct, sexe, nationalite, document_source_reference, langue_document, demandeur, motif, reference_demande, date_generation.
+- POI XWPF : un placeholder peut être éclaté en plusieurs runs ; fusionner les runs avant remplacement. Traiter corps, tableaux imbriqués, en-têtes et pieds de page.
+- Échapper/neutraliser les valeurs injectées ; aucune macro, aucun champ actif.
+- Dates présentées selon langue_document ; valeur canonique conservée en ISO.
+- Après génération : vérifier l'absence de placeholder résiduel, sinon échouer en GENERATION_FAILED (jamais de document partiel stocké).

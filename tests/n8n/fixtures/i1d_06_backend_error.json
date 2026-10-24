@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "I1D-06",
+  "gate": "I-D",
+  "caseNumber": 6,
+  "caseKey": "backend_error",
+  "title": "Réponse backend simulée en erreur",
+  "description": "E4 renvoie trois fois un 5xx reçu ; le workflow doit retourner 500 INTERNAL_ERROR sans exposer de stack trace.",
+  "synthetic": true,
+  "input": {
+    "method": "POST",
+    "path": "/webhook/document-generation",
+    "correlationId": "66666666-6666-4666-8666-666666666666",
+    "events": [
+      {
+        "sequence": 1,
+        "body": {
+          "message": "Génère une attestation de concordance pour Camille Fictive, née le 01/01/1980 à Ville-Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
+          "requestId": null
+        }
+      }
+    ]
+  },
+  "stubs": [
+    {
+      "stage": "OLLAMA",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentType": "ATTESTATION_CONCORDANCE",
+        "confidence": 0.96,
+        "data": {
+          "prenom": "Camille",
+          "nom": "Fictive",
+          "dateNaissance": "1980-01-01",
+          "lieuNaissance": "Ville-Fictive",
+          "nomIncorrect": "Camil Fictif",
+          "nomCorrect": "Camille Fictive"
+        },
+        "missingFields": []
+      }
+    },
+    {
+      "stage": "E8",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "valid": true
+      }
+    },
+    {
+      "stage": "E1",
+      "mode": "success",
+      "httpStatus": 201,
+      "delayMs": 0,
+      "body": {
+        "status": "VALIDATED",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": []
+      }
+    },
+    {
+      "stage": "E4",
+      "mode": "error",
+      "httpStatus": 500,
+      "delayMs": 0,
+      "body": {
+        "code": "INTERNAL_ERROR",
+        "message": "Simulated backend failure"
+      }
+    },
+    {
+      "stage": "E4",
+      "mode": "error",
+      "httpStatus": 500,
+      "delayMs": 0,
+      "body": {
+        "code": "INTERNAL_ERROR",
+        "message": "Simulated backend failure"
+      }
+    },
+    {
+      "stage": "E4",
+      "mode": "error",
+      "httpStatus": 500,
+      "delayMs": 0,
+      "body": {
+        "code": "INTERNAL_ERROR",
+        "message": "Simulated backend failure"
+      }
+    }
+  ],
+  "expected": {
+    "finalHttpStatus": 500,
+    "finalOutcome": "ERROR",
+    "errorCode": "INTERNAL_ERROR",
+    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "documentId": null,
+    "missingFields": [],
+    "calls": {
+      "OLLAMA": 1,
+      "E8": 1,
+      "E1": 1,
+      "E2": 0,
+      "E3": 0,
+      "E4": 3,
+      "E5": 0,
+      "E6": 0
+    },
+    "idempotency": null,
+    "securityScan": {
+      "piiInLogs": false,
+      "binaryInExecutionData": false
+    }
+  },
+  "securityProbe": null
+}

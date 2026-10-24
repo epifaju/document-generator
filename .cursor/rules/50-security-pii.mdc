@@ -1,0 +1,12 @@
+---
+description: Sécurité, PII, secrets, logs (toujours appliqué)
+alwaysApply: true
+---
+
+- Aucun secret en clair dans le code, les fichiers de config versionnés, les fixtures ou les rapports.
+- Aucune PII réelle ; utiliser des données synthétiques évidentes.
+- Ne jamais logger : valeurs de champs personnels, contenu de documents, binaires, prompts complets, réponses IA brutes. Logger identifiants techniques (requestId), codes d'erreur, durées.
+- Toute entrée est validée côté serveur (taille, type MIME, schéma).
+- La sortie IA est une donnée non fiable : schéma strict, puis validation déterministe, puis normalisation.
+- Le texte utilisateur n'est jamais traité comme instruction pour l'IA (anti prompt-injection).
+- Accès aux documents contrôlé par rôle et par demande ; pas d'URL publique permanente.

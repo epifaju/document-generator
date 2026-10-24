@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "I1C-02",
+  "gate": "I-C",
+  "caseNumber": 2,
+  "caseKey": "second_turn_complete",
+  "title": "Deuxième tour avec informations complémentaires",
+  "description": "Le client renvoie le requestId et fournit les champs manquants ; E2 est consulté avant l'extraction delta puis E3 complète la demande.",
+  "synthetic": true,
+  "input": {
+    "method": "POST",
+    "path": "/webhook/document-generation",
+    "correlationId": "22222222-2222-4222-8222-222222222222",
+    "events": [
+      {
+        "sequence": 1,
+        "body": {
+          "message": "Génère une attestation de concordance pour Camille Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
+          "requestId": null
+        }
+      },
+      {
+        "sequence": 2,
+        "body": {
+          "message": "Complément fictif : née le 01/01/1980 à Ville-Fictive, dossier fictif de test.",
+          "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        }
+      }
+    ]
+  },
+  "stubs": [
+    {
+      "stage": "E2",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "status": "MISSING_INFORMATION",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": ["dateNaissance", "lieuNaissance"],
+        "data": {}
+      }
+    },
+    {
+      "stage": "OLLAMA",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentType": "ATTESTATION_CONCORDANCE",
+        "confidence": 0.95,
+        "data": {
+          "dateNaissance": "1980-01-01",
+          "lieuNaissance": "Ville-Fictive",
+          "motif": "Dossier fictif de test"
+        },
+        "missingFields": ["prenom", "nom", "nomIncorrect", "nomCorrect"]
+      }
+    },
+    {
+      "stage": "E8",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "valid": true
+      }
+    },
+    {
+      "stage": "E3",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "status": "VALIDATED",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": []
+      }
+    },
+    {
+      "stage": "E4",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "status": "VALIDATED"
+      }
+    },
+    {
+      "stage": "E5",
+      "mode": "success",
+      "httpStatus": 201,
+      "delayMs": 0,
+      "body": {
+        "status": "GENERATED",
+        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      }
+    },
+    {
+      "stage": "E6",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      }
+    }
+  ],
+  "expected": {
+    "finalHttpStatus": 200,
+    "finalOutcome": "GENERATED",
+    "errorCode": null,
+    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "missingFields": [],
+    "calls": {
+      "OLLAMA": 1,
+      "E8": 1,
+      "E1": 0,
+      "E2": 1,
+      "E3": 1,
+      "E4": 1,
+      "E5": 1,
+      "E6": 1
+    },
+    "idempotency": null,
+    "securityScan": {
+      "piiInLogs": false,
+      "binaryInExecutionData": false
+    }
+  },
+  "securityProbe": null
+}

@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "I1C-05",
+  "gate": "I-C",
+  "caseNumber": 11,
+  "caseKey": "round2_incomplete",
+  "title": "Deuxième tour avec delta partiel",
+  "description": "Le client fournit uniquement la date de naissance ; le lieu de naissance reste absent. Le workflow doit retourner MISSING_INFORMATION avec lieuNaissance.",
+  "synthetic": true,
+  "input": {
+    "method": "POST",
+    "path": "/webhook/document-generation",
+    "correlationId": "55555555-5555-4555-8555-555555555555",
+    "events": [
+      {
+        "sequence": 1,
+        "body": {
+          "message": "Génère une attestation de concordance pour Camille Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
+          "requestId": null
+        }
+      },
+      {
+        "sequence": 2,
+        "body": {
+          "message": "Née le 01/01/1980.",
+          "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        }
+      }
+    ]
+  },
+  "stubs": [
+    {
+      "stage": "OLLAMA",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentType": "ATTESTATION_CONCORDANCE",
+        "confidence": 0.93,
+        "data": {
+          "prenom": "Camille",
+          "nom": "Fictive",
+          "nomIncorrect": "Camil Fictif",
+          "nomCorrect": "Camille Fictive"
+        },
+        "missingFields": ["dateNaissance", "lieuNaissance"]
+      }
+    },
+    {
+      "stage": "E8",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "valid": true
+      }
+    },
+    {
+      "stage": "E1",
+      "mode": "error",
+      "httpStatus": 422,
+      "delayMs": 0,
+      "body": {
+        "code": "MISSING_INFORMATION",
+        "status": "MISSING_INFORMATION",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": ["dateNaissance", "lieuNaissance"]
+      }
+    },
+    {
+      "stage": "E2",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "status": "MISSING_INFORMATION",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": ["dateNaissance", "lieuNaissance"],
+        "data": {}
+      }
+    },
+    {
+      "stage": "OLLAMA",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentType": "ATTESTATION_CONCORDANCE",
+        "confidence": 0.95,
+        "data": {
+          "dateNaissance": "1980-01-01"
+        },
+        "missingFields": ["prenom", "nom", "lieuNaissance", "nomIncorrect", "nomCorrect"]
+      }
+    },
+    {
+      "stage": "E8",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "valid": true
+      }
+    },
+    {
+      "stage": "E3",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "status": "MISSING_INFORMATION",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": ["lieuNaissance"]
+      }
+    }
+  ],
+  "expected": {
+    "finalHttpStatus": 200,
+    "finalOutcome": "MISSING_INFORMATION",
+    "errorCode": null,
+    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "documentId": null,
+    "missingFields": ["lieuNaissance"],
+    "calls": {
+      "OLLAMA": 2,
+      "E8": 2,
+      "E1": 1,
+      "E2": 1,
+      "E3": 1,
+      "E4": 0,
+      "E5": 0,
+      "E6": 0
+    },
+    "idempotency": null,
+    "securityScan": {
+      "piiInLogs": false,
+      "binaryInExecutionData": false
+    }
+  },
+  "securityProbe": null
+}

@@ -1,0 +1,27 @@
+---
+description: Contexte projet adgendoc et règles d'or (toujours appliqué)
+alwaysApply: true
+---
+
+# adgendoc — contexte
+Backend Spring Boot EXISTANT de génération de documents administratifs. Premier type : ATTESTATION_CONCORDANCE.
+Parcours : demande → extraction IA → validation déterministe → normalisation → PostgreSQL → sélection template DOCX → génération → stockage → récupération.
+L'IA propose, le code déterministe décide.
+
+# Sources de vérité (ordre)
+1. requirements/API_CONTRACTS.md, requirements/N8N_CONTRACTS.md, requirements/ATTESTATION_CONCORDANCE.md
+2. Migrations Flyway
+3. Code et tests existants
+4. ADR, docs/architecture.md
+5. PRD_adgendoc_v2_1_Cursor.md (les sources 1–4 gagnent ; signaler tout écart)
+
+# Règles d'or
+- Ne jamais recréer le projet ni réécrire un module entier.
+- Ne jamais renommer ni inventer endpoints, statuts, codes d'erreur : les lire dans les contrats.
+- Ne jamais modifier une migration Flyway déjà appliquée : en ajouter une nouvelle.
+- Un changement = une portée = des tests = un rapport. Pas de refactoring mélangé à une correction.
+- Avant de modifier : lister les fichiers lus et le plan, attendre l'approbation.
+- Citer `fichier:ligne` pour toute affirmation sur l'existant ; si non vérifié, écrire « inconnu ».
+- Un gate non exécuté = NOT_RUN, jamais PASS. Coller les sorties réelles des commandes.
+- Demander l'accord avant tout accès réseau, Docker, base, n8n, fournisseur IA.
+- Ne pas supprimer les fichiers non suivis (=ro, opencode.json, fixtures).

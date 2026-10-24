@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "I1D-05",
+  "gate": "I-D",
+  "caseNumber": 5,
+  "caseKey": "duplicate_message",
+  "title": "Message utilisateur dupliqué",
+  "description": "Deux webhooks identiques portent le même requestId ; E2 est consulté en tête et le même document est retourné sans nouvelle création.",
+  "synthetic": true,
+  "input": {
+    "method": "POST",
+    "path": "/webhook/document-generation",
+    "correlationId": "55555555-5555-4555-8555-555555555555",
+    "events": [
+      {
+        "sequence": 1,
+        "body": {
+          "message": "Relance fictive de la demande existante.",
+          "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        }
+      },
+      {
+        "sequence": 2,
+        "body": {
+          "message": "Relance fictive de la demande existante.",
+          "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        }
+      }
+    ]
+  },
+  "stubs": [
+    {
+      "stage": "E2",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "status": "GENERATED",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": [],
+        "documents": [
+          {
+            "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "generatedAt": "2026-01-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "stage": "E6",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      }
+    },
+    {
+      "stage": "E2",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "status": "GENERATED",
+        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "missingFields": [],
+        "documents": [
+          {
+            "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "generatedAt": "2026-01-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "stage": "E6",
+      "mode": "success",
+      "httpStatus": 200,
+      "delayMs": 0,
+      "body": {
+        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      }
+    }
+  ],
+  "expected": {
+    "finalHttpStatus": 200,
+    "finalOutcome": "GENERATED",
+    "errorCode": null,
+    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "missingFields": [],
+    "calls": {
+      "OLLAMA": 0,
+      "E8": 0,
+      "E1": 0,
+      "E2": 2,
+      "E3": 0,
+      "E4": 0,
+      "E5": 0,
+      "E6": 2
+    },
+    "idempotency": {
+      "key": "same-requestId",
+      "sameDocumentId": true
+    },
+    "securityScan": {
+      "piiInLogs": false,
+      "binaryInExecutionData": false
+    }
+  },
+  "securityProbe": null
+}
