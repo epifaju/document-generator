@@ -1,6 +1,7 @@
-# PRD — Document Generator (adgendoc) — v2.1
+# PRD — Document Generator (adgendoc) — v2.2
 
-**Version :** 2.1 — révision du PRD v1.0 du 23/10/2026, optimisée pour Cursor AI ; **alignée sur `API_CONTRACTS.md` (v1) et `N8N_CONTRACTS.md` (v1)**
+**Version :** 2.2 (corrections issues de l'audit G0 backend ; voir la ligne « Changements v2.1 → v2.2 » ci-dessous) — v2.1 : révision du PRD v1.0 du 23/10/2026, optimisée pour Cursor AI ; **alignée sur `API_CONTRACTS.md` (v1) et `N8N_CONTRACTS.md` (v1)**
+**Changements v2.1 → v2.2 :** (1) §12.1 : le 400 de E8 a pour corps `ExtractionValidationResponse` (API_CONTRACTS l.440), pas `ErrorResponse` ; (2) FR-06 : motif de placeholder à confirmer sur le template réel (le moteur traite `{{…}}`) ; (3) commandes : le wrapper Maven est absent du dépôt → `mvn` ou lot d'ajout du wrapper ; (4) §10 : Spring Boot 3.3.13 est hors support OSS, migration planifiée par ADR ; (5) les `*IT` ne sont pas exécutés par Surefire par défaut → Failsafe requis ; (6) la classe `RequestStateMachine` reste une proposition : la matrice de transitions existe dans `RequestStatus`.
 **Changements v2 → v2.1 :** machine à états réelle (§8) ; mapping erreurs rempli depuis les contrats (§12) ; section d'incohérences des contrats (§12.3) ; retrait des propositions contraires aux contrats (ProblemDetail, JWT/RBAC en it.1, `Idempotency-Key`) ; extraction IA alignée sur E8/Ollama (§11)
 **Statut :** Projet existant (Java / Spring Boot) — stabilisation incrémentale, **pas de réécriture**
 **Produit :** Génération contrôlée de documents administratifs à partir de demandes structurées et de données extraites par IA
@@ -142,7 +143,7 @@ Multi-types en production, signature électronique, paiement, portail public, OC
 | FR-03 | P0 | Valider sans dépendre de l'IA | Tests unitaires (obligatoires, dates, règles métier) sans appel IA |
 | FR-04 | P0 | Normaliser | ISO 8601 ; transformations déterministes et idempotentes |
 | FR-05 | P0 | Persister demande + audit | Transaction cohérente ; références stables |
-| FR-06 | P0 | Générer le DOCX depuis un template versionné | 14 placeholders remplacés ; 0 `${…}`/`{{…}}` résiduel ; fichier ouvrable |
+| FR-06 | P0 | Générer le DOCX depuis un template versionné | 14 placeholders remplacés ; 0 motif de placeholder résiduel (syntaxe réelle du template, `{{…}}` d'après le moteur — `[À CONFIRMER]` sur le fichier .docx) ; fichier ouvrable |
 | FR-07 | P0 | Stocker et récupérer | Document lié à la demande ; contrôle d'accès |
 | FR-08 | P0 | Exposer les endpoints contractuels | Tests de contrat HTTP verts contre `API_CONTRACTS.md` |
 | FR-09 | P1 | Complétion multi-tours | `missingFields` cohérents ; transitions conformes |
@@ -162,7 +163,7 @@ Multi-types en production, signature électronique, paiement, portail public, OC
 | NFR-02 | Résilience | Timeouts explicites sur chaque appel sortant ; retries bornés avec backoff + jitter ; circuit breaker sur l'IA |
 | NFR-03 | Idempotence | E3/E4 idempotents (contrat) ; verrou optimiste `@Version` sur la demande (finding `F-I-3`, `[À CONFIRMER]`) ; **E1 n'a pas de clé d'idempotence** : en ajouter une est un changement de contrat → `[DÉCISION]` it.2, additif et rétrocompatible |
 | NFR-04 | Observabilité | Logs JSON structurés, `requestId` en MDC, métriques par étape, traces distribuées, **sans PII** |
-| NFR-05 | Reproductibilité | `docker compose up` + `./mvnw verify` suffisent à rejouer tout le parcours ; pas de dépendance à PowerShell seul |
+| NFR-05 | Reproductibilité | `docker compose up` + `mvn verify` (ou `./mvnw verify` une fois le wrapper ajouté, `[PROPOSÉ]`) suffisent à rejouer tout le parcours ; pas de dépendance à PowerShell seul |
 | NFR-06 | Portabilité | Tests exécutables Windows/Linux/CI (scripts `.ps1` doublés d'un équivalent bash ou d'un test Java) |
 | NFR-07 | Maintenabilité | Architecture hexagonale vérifiée par ArchUnit ; couverture JaCoCo ≥ 80 % sur domaine et validation |
 | NFR-08 | Sécurité | OWASP ASVS niveau 2 comme référence ; dépendances et images scannées en CI |
@@ -229,8 +230,8 @@ Règles : le domaine n'importe ni Spring, ni JPA, ni POI, ni client IA ; les con
 
 | Domaine | Choix | Statut | Justification |
 |---|---|---|---|
-| Langage | Java 21 LTS (unifier 17/21 par ADR) | `[DÉCISION]` | Une seule version sur tous les modules et la CI |
-| Framework | Spring Boot 3.x, Maven (wrapper) | `[EXISTANT]` | — |
+| Langage | Java 17 actuel (`pom.xml`) ; Java 21 LTS cible | `[DÉCISION]` | Une seule version sur tous les modules et la CI ; décision liée à la migration Spring Boot |
+| Framework | Spring Boot 3.3.13, Maven (wrapper **absent**), POI 5.2.5 | `[EXISTANT]` (audit G0) | **3.3.13 = dernière version OSS de la branche 3.3** : migration vers une branche supportée à planifier par ADR, **après** les tests de contrat qui servent de filet |
 | Base | PostgreSQL + Flyway | `[EXISTANT]` | Migrations versionnées ; **aucune modification d'une migration déjà appliquée** |
 | DOCX | Apache POI (`XWPF`) | `[EXISTANT]` | Gérer les placeholders éclatés en plusieurs *runs* (cause classique de résidus) |
 | Orchestration | n8n | `[EXISTANT]` | — |
@@ -274,7 +275,7 @@ Règles : le domaine n'importe ni Spring, ni JPA, ni POI, ni client IA ; les con
 |---|---|---|---|
 | 200 | — | E2, E3, E4, E7, E8 | E3 : statut **recalculé** (`VALIDATED`, `MISSING_INFORMATION`, `FAILED`→reprise) |
 | 201 | — | E1 (`VALIDATED`), E5 (`GENERATED`) | persisté |
-| 400 | `VALIDATION_ERROR` + `fieldErrors[]` | E1, E3, E4, E8 | **Enveloppe invalide** (JSON malformé, `documentType` inconnu, clé racine inconnue, `Content-Type` ≠ JSON) → **non persisté**. **Règle métier violée dans `data`** (ex. `ERR_DATE_FUTUR`, `ERR_NOM_CONCORDANCE_IDENTIQUE`, clé inconnue dans `data` à la création) → persisté `REJECTED` + `requestId`. E3 : clé inconnue/réservée (`ERR_CHAMP_INCONNU`/`ERR_CHAMP_RESERVE`) → **aucune mutation**, jamais `REJECTED` |
+| 400 | `VALIDATION_ERROR` + `fieldErrors[]` | E1, E3, E4 (**E8 : corps `ExtractionValidationResponse`**, API_CONTRACTS l.440) | **Enveloppe invalide** (JSON malformé, `documentType` inconnu, clé racine inconnue, `Content-Type` ≠ JSON) → **non persisté**. **Règle métier violée dans `data`** (ex. `ERR_DATE_FUTUR`, `ERR_NOM_CONCORDANCE_IDENTIQUE`, clé inconnue dans `data` à la création) → persisté `REJECTED` + `requestId`. E3 : clé inconnue/réservée (`ERR_CHAMP_INCONNU`/`ERR_CHAMP_RESERVE`) → **aucune mutation**, jamais `REJECTED` |
 | 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | tous sauf E7 | **it.2 seulement** |
 | 404 | `REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` | E2–E6 | — |
 | 409 | `INVALID_STATUS` | E4, E5 | statut source interdit |
@@ -309,7 +310,7 @@ Codes de champ à préserver : `ERR_PAYLOAD_INVALIDE`, `ERR_DOCUMENT_TYPE_NON_SU
 
 | ID | Constat | Source | Proposition |
 |---|---|---|---|
-| Q-01 | **RÉSOLUE** — décision humaine, 2026-10-24. `REJECTED` via E3 = HTTP `400` (`ErrorResponse`, `VALIDATION_ERROR`, statut `REJECTED` persisté). | API §3.3 ; N8N §5 | `docs/adr/ADR-001-e3-regle-metier-400.md` |
+| Q-01 | **E3 : contradiction interne.** Le tableau « 200 » cite une rétrogradation vers `REJECTED` (T10) alors que la ligne « 400 » dit qu'une règle violée → `REJECTED` avec 400. N8N §5 route aussi un « PATCH 200 → `REJECTED` ». | API §3.3 ; N8N §5 | Trancher : `REJECTED` via E3 = **400** (recommandé, cohérent avec E1/E4) ; corriger les deux textes et les tests n8n |
 | Q-02 | E3 renvoie **200** `MISSING_INFORMATION` quand il reste des champs absents, alors que E1/E4 renvoient **422**. | API §3.3 vs §3.1/3.4 | Documenter explicitement comme choix voulu (la complétion est une conversation) ou aligner |
 | Q-03 | `ErrorResponse.correlationId` typé **UUID**, mais n8n accepte `^[A-Za-z0-9-]{8,64}$` et le filtre backend `^[A-Za-z0-9-]{1,64}$`. | API §2.3 vs N8N §1.1 | Typer `string` (pattern commun) |
 | Q-04 | **`REJECTED` terminal** : une simple faute de date dans `data` fige la demande ; le round suivant impose une **nouvelle** demande (2ᵉ ligne avec la même PII, finding `F-I-4`). | API §1.4, §3.3 ; N8N §5 | Décision produit : autoriser la correction depuis `REJECTED` (E3) ou assumer la duplication et fixer la rétention |
@@ -348,7 +349,7 @@ Les tableaux 12.1 et 12.2 deviennent la source de deux **tests paramétrés** (b
 | Gate | Contenu | Statut initial |
 |---|---|---|
 | G0 | Inventaire, `git status`, contrats, tests ; aucune modification | NOT_RUN |
-| G1 | `./mvnw verify` : build + unitaires | NOT_RUN |
+| G1 | `mvn verify` (Failsafe configuré pour les `*IT`) : build + unitaires | NOT_RUN |
 | G2 | Intégration persistance (Testcontainers ou environnement autorisé) | NOT_RUN |
 | G3 | DOCX généré et vérifié, 0 placeholder résiduel | NOT_RUN |
 | G4 | Contrat HTTP E2E, erreurs, téléchargement | NOT_RUN |
@@ -380,7 +381,7 @@ docs/adr/                      # une décision = un ADR
 1. **Plan** (mode Plan/Ask) : l'agent liste fichiers lus, hypothèses, risques, tests à écrire ; **aucune modification** avant approbation.
 2. **Tests d'abord** : écrire/adapter le test qui échoue (critère d'acceptation du FR visé).
 3. **Implémentation minimale** (mode Agent), un seul lot, une seule PR.
-4. **Vérification** : `./mvnw verify` + commandes du gate concerné ; coller les sorties réelles dans le rapport.
+4. **Vérification** : `mvn verify` + commandes du gate concerné ; coller les sorties réelles dans le rapport.
 5. **Revue** : relire le diff avec une checklist (contrats, PII, hexagone, tests) ; contrôle indépendant (second agent ou humain).
 6. **Rapport** : `docs/reports/<lot>.md` (changements, gates, `NOT_RUN` restants, écarts).
 
@@ -388,7 +389,7 @@ Conseils d'efficacité : référencer les fichiers avec `@fichier`/`@dossier` pl
 
 ### 15.3 Prompt de démarrage (audit, lecture seule)
 
-> Tu reprends le dépôt Spring Boot EXISTANT `document-generator` (adgendoc). Ne le recrée pas. Lis `AGENTS.md`, `.cursor/rules`, `PRD_adgendoc_v2_1_Cursor.md`, `requirements/*` (dont `API_CONTRACTS.md` et `N8N_CONTRACTS.md`), `docs/architecture.md`, les ADR, les migrations Flyway, les tests, le template DOCX, `tests/n8n/` et `git status`. **Lecture seule : ne modifie aucun fichier.** Produis : (1) une carte des modules ; (2) une matrice FR-xx × {implémenté / partiel / non implémenté / inconnu} × tests × `fichier:ligne` ; (3) les écarts entre le code/les tests et les tableaux §12.1 et §12.2 ; (4) les écarts entre ce PRD et le dépôt ; (5) les 5 risques principaux ; (6) un plan de 5 petites tâches priorisées. Préserve les fichiers non suivis (`=ro`, `opencode.json`). Ne lance ni Docker, ni n8n, ni PostgreSQL, ni Ollama, ni accès réseau sans mon accord.
+> Tu reprends le dépôt Spring Boot EXISTANT `document-generator` (adgendoc). Ne le recrée pas. Lis `AGENTS.md`, `.cursor/rules`, `PRD_adgendoc_v2_2_Cursor.md`, `requirements/*` (dont `API_CONTRACTS.md` et `N8N_CONTRACTS.md`), `docs/architecture.md`, les ADR, les migrations Flyway, les tests, le template DOCX, `tests/n8n/` et `git status`. **Lecture seule : ne modifie aucun fichier.** Produis : (1) une carte des modules ; (2) une matrice FR-xx × {implémenté / partiel / non implémenté / inconnu} × tests × `fichier:ligne` ; (3) les écarts entre le code/les tests et les tableaux §12.1 et §12.2 ; (4) les écarts entre ce PRD et le dépôt ; (5) les 5 risques principaux ; (6) un plan de 5 petites tâches priorisées. Préserve les fichiers non suivis (`=ro`, `opencode.json`). Ne lance ni Docker, ni n8n, ni PostgreSQL, ni Ollama, ni accès réseau sans mon accord.
 
 ### 15.4 Prompt type pour un lot d'implémentation
 

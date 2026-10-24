@@ -1,0 +1,2978 @@
+﻿diff --git a/docs/reports/L3-coherence-fixtures.md b/docs/reports/L3-coherence-fixtures.md
+new file mode 100644
+index 0000000..19d13dc
+--- /dev/null
++++ b/docs/reports/L3-coherence-fixtures.md
+@@ -0,0 +1,222 @@
++# L3 ÔÇö Coh├®rence des fixtures n8n
++
++| | |
++|---|---|
++| R├┤le | n8n-developer / tester |
++| Exigences | FR-12 (couverture I-C / I-D statique), forme delta `allOf`, `ErrorResponse.code` |
++| ADR | aucun (ADR-002 reste PROPOS├ë, non modifi├®) |
++| Date | 2026-10-24 |
++| Cycle | 1/3 |
++| D├®cision humaine | Accord d'├®criture avec quatre ajustements (simulation `contactEmail`, auto-tests avant contr├┤le, exemption delta structurelle, motif de naissance born├®). |
++
++## STATUS
++
++Cycle 1 termin├®. Les fixtures delta re-d├®clarent les cl├®s obligatoires absentes de leur `data`, les corps E1 `422` portent `code`, le validateur refuse un message de naissance incoh├®rent avec l'extraction r├®ussie, et I1D-09 est document├®. Sortie finale : `SELFTEST_PASSED=25 SELFTEST_FAILED=0`, `PASSED=12 FAILED=0`. Revue fra├«che non faite. G5 reste `NOT_RUN`.
++
++## FINDINGS
++
++ADR-002 (`docs/adr/ADR-002-e3-missing-information-200.md:3`) est **PROPOS├ë**. Aucun point de ce lot ne choisit le HTTP d'E3. E3 d'I1C-05 reste un succ├¿s `200`. Les `422` corrig├®s sont des E1.
++
++### A ÔÇö forme delta
++
++FIX-02 est le correctif `DG-I1-FIXTURES-FIX-001` : il compare les `missingFields` des stubs OLLAMA, E1, E3 et E2 ├á `expected.missingFields`, la liste backend de l'outcome. Ce n'est pas un code HTTP.
++
++L'exemption ajout├®e ne cite aucun `fixtureId`. Un tour ÔëÑ 2 est un ├®v├®nement dont `requestId` est non nul. Son extraction est l'OLLAMA en succ├¿s situ├® apr├¿s le premier stub E2 (`tests/n8n/validate_i1_fixtures.ps1:214-229`). Pour ce stub, `missingFields` doit ├®galer, ordre canonique, les six cl├®s obligatoires absentes de son `data` (`:204-211`, `:582`).
++
++Inventaire : seules I1C-02 (unique OLLAMA, apr├¿s E2) et I1C-05 (second OLLAMA) sont des extractions de tour ÔëÑ 2. I1D-05 a deux ├®v├®nements et z├®ro OLLAMA.
++
++| Fixture | `missingFields` du delta |
++|---|---|
++| I1C-02 | `prenom`, `nom`, `nomIncorrect`, `nomCorrect` |
++| I1C-05, second OLLAMA | `prenom`, `nom`, `lieuNaissance`, `nomIncorrect`, `nomCorrect` |
++
++`expected.missingFields` reste `[]` (I1C-02) et `[lieuNaissance]` (I1C-05, aussi le corps E3). Le premier OLLAMA d'I1C-05 n'est pas un delta.
++
++### B ÔÇö `code` des 422
++
++Corpus : deux corps backend `422`, aucun `400`. E1 d'I1C-03 et d'I1C-05 portent `"code": "MISSING_INFORMATION"` (`requirements/API_CONTRACTS.md:170`, `:277`). Statut, HTTP et `expected` inchang├®s. E8 `400` reste un `ExtractionValidationResponse` (`requirements/API_CONTRACTS.md:440`) et n'est pas soumis ├á cette r├¿gle.
++
++### C ÔÇö phrase de naissance
++
++Motif, sans ┬½ ├á ┬╗ isol├® :
++
++- date : `n├®` ou `n├®e`, puis `le`, puis `jj/mm/aaaa` ou `jj-mm-aaaa` ;
++- lieu : la m├¬me phrase, puis `├á` minuscule, puis un mot ├á majuscule initiale.
++
++Sonde locale du motif : ┬½ ├Ç partir de la demande ┬╗ et ┬½ ├á partir de rien ┬╗ donnent date=0 et lieu=0. ┬½ n├® le 01/01/1980 ├á partir ┬╗ donne date=1 et lieu=0.
++
++Appariement depuis la fin, uniquement avec un OLLAMA en succ├¿s. Fixtures ├á extraction r├®ussie :
++
++| Fixture | Contr├┤le |
++|---|---|
++| I1C-01 | s'applique ; `01/01/1980` et `Ville-Fictive` sont dans `data` ; passe |
++| I1C-02 | s'applique ├á l'├®v├®nement 2 ; passe. L'├®v├®nement 1 n'a pas d'extraction appari├®e |
++| I1C-03 | phrase absente ; non d├®clench├® ; passe |
++| I1C-05 | ├®v├®nement 1 non d├®clench├®. ├ëv├®nement 2 : `N├®e le 01/01/1980` correspond ├á `1980-01-01` ; pas de lieu ; passe |
++| I1D-06 | s'applique ; passe |
++| I1D-09 | s'applique sur la phrase de naissance ; passe. Passeport et courriel hors motif |
++| I1D-10 | s'applique ; passe |
++
++Aucune fixture hostile n'a ├®t├® modifi├®e.
++
++### D ÔÇö I1D-09
++
++`FAKE-PP-0001` et `fictif@example.invalid` sont les marqueurs `securityProbe.markers` (`tests/n8n/fixtures/i1d_09_fictitious_pii.json:123-124`). Le validateur les cherche comme sous-cha├«nes du payload analys├® `input` + `stubs`, `securityProbe` exclu (`validate_i1_fixtures.ps1:264-274`, `:851-862`). Il n'exige pas leur pr├®sence dans `data`. Les deux cha├«nes sont dans le message ; cela suffit.
++
++`contactEmail` est une cl├® valide de `data` (`requirements/API_CONTRACTS.md:95`). L'absence de `fictif@example.invalid` dans le `data` OLLAMA est une simulation d├®lib├®r├®e d'un LLM qui n'extrait pas un champ optionnel. La contrainte 4 du prompt (`prompts/extraction/system_prompt_attestation_concordance.md:24-28`) ne verse dans `missingFields` que les six cl├®s obligatoires ; une cl├® optionnelle non ├®mise reste absente de `data`. Seul `FAKE-PP-0001` est une cl├® inconnue (`passeport`, pilote S12).
++
++## FILES_CHANGED
++
++Fichiers du lot, tous non suivis (`git status` : `??`) :
++
++- `tests/n8n/validate_i1_fixtures.ps1` ÔÇö exemption delta structurelle, contr├┤le `code` des 400/422 backend, contr├┤le de phrase de naissance, quatre auto-tests.
++- `tests/n8n/fixtures/i1c_02_second_turn_complete.json` ÔÇö `missingFields` de l'OLLAMA delta.
++- `tests/n8n/fixtures/i1c_03_missing_information.json` ÔÇö `code` sur l'E1 422.
++- `tests/n8n/fixtures/i1c_05_round2_incomplete.json` ÔÇö `missingFields` du second OLLAMA et `code` sur l'E1 422.
++- `tests/n8n/FIXTURES_I1.md` ÔÇö FIX-02, exemption, motif, d├®cision I1D-09, d├®compte 25.
++- `docs/reports/L3-coherence-fixtures.md` ÔÇö ce rapport.
++
++`tests/n8n/fixtures/` est non suivi. Les fixtures I1D, I1C-01 et I1C-04 n'ont pas ├®t├® modifi├®es.
++
++Hors lot : `AGENTS.md` est modifi├® dans l'arbre (`git status` : `M`, +178 / ÔêÆ14). Ce cycle ne l'a pas touch├®. Aucun `git add`, aucun commit. Aucun contrat, aucun backend, aucun ADR.
++
++## TESTS
++
++Commande (locale, sans Docker, r├®seau, base, n8n ni Ollama) :
++
++```text
++powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\n8n\validate_i1_fixtures.ps1 -SelfTest
++```
++
++├ëchec r├®el apr├¿s les quatre auto-tests, avant les contr├┤les A, B et C. Code de sortie 1 :
++
++```text
++DG-I1-FIXTURES-001 static validator
++fixtureDir=C:\Users\epifa\cursor-workspace\document-generator\tests\n8n\fixtures
++PASS i1c_01_initial_valid.json
++PASS i1c_02_second_turn_complete.json
++PASS i1c_03_missing_information.json
++PASS i1c_04_invalid_request_reference.json
++PASS i1c_05_round2_incomplete.json
++PASS i1d_05_duplicate_message.json
++PASS i1d_06_backend_error.json
++PASS i1d_07_ollama_unavailable.json
++PASS i1d_08_timeout.json
++PASS i1d_09_fictitious_pii.json
++PASS i1d_10_binary_content.json
++PASS fixture identifiers unique
++--- SELF-TEST (negative mutations) ---
++SELFTEST missing-finalOutcome PASS
++SELFTEST invalid-finalOutcome PASS
++SELFTEST generated-to-rejected PASS
++SELFTEST generated-to-error PASS
++SELFTEST incorrect-http-status PASS
++SELFTEST incorrect-error-code PASS
++SELFTEST invalid-requestId PASS
++SELFTEST inconsistent-requestId PASS
++SELFTEST inconsistent-documentId PASS
++SELFTEST inconsistent-missingFields PASS
++SELFTEST stub-count-mismatch PASS
++SELFTEST duplicate-fixtureId PASS
++SELFTEST missing-pii-markers PASS
++SELFTEST pii-marker-absent-from-payload PASS
++SELFTEST binary-signature-absent PASS
++SELFTEST bad-binary-magic PASS
++SELFTEST step-order-i1c-05 PASS
++SELFTEST e3-http-i1c-05 PASS
++SELFTEST step-order-i1c-02 PASS
++SELFTEST step-order-i1d-05 PASS
++SELFTEST utf8-bom-rejected PASS
++SELFTEST message-place-absent FAIL
++      expected diagnostic: message birth place is absent from the paired extraction
++      actual errors: <none>
++SELFTEST message-date-absent FAIL
++      expected diagnostic: message birth date is absent from the paired extraction
++      actual errors: <none>
++SELFTEST delta-missing-undeclared FAIL
++      expected diagnostic: delta extraction missingFields must redeclare every mandatory key absent from data
++      actual error: missingFields do not match expected.missingFields for stub stage OLLAMA
++SELFTEST error-code-absent FAIL
++      expected diagnostic: backend 422/400 body.code is absent
++      actual errors: <none>
++SELFTEST_PASSED=21 SELFTEST_FAILED=4
++PASSED=12 FAILED=4
++RESULT: FAIL
++```
++
++`delta-missing-undeclared` tombait encore sur la comparaison FIX-02. Les trois autres diagnostics ├®taient absents.
++
++Les litt├®raux accentu├®s des mutations C, ├®crits dans le script UTF-8 sans BOM, ne survivent pas ├á la lecture Windows PowerShell 5.1. Apr├¿s branchement du contr├┤le, ces deux auto-tests restaient ├á `actual errors: <none>`. Les mutations ont ├®t├® reconstruites avec `[char]0x00E9` et `[char]0x00E0`. Le contr├┤le les rejette ensuite.
++
++M├¬me commande apr├¿s corrections. Code de sortie 0 :
++
++```text
++DG-I1-FIXTURES-001 static validator
++fixtureDir=C:\Users\epifa\cursor-workspace\document-generator\tests\n8n\fixtures
++PASS i1c_01_initial_valid.json
++PASS i1c_02_second_turn_complete.json
++PASS i1c_03_missing_information.json
++PASS i1c_04_invalid_request_reference.json
++PASS i1c_05_round2_incomplete.json
++PASS i1d_05_duplicate_message.json
++PASS i1d_06_backend_error.json
++PASS i1d_07_ollama_unavailable.json
++PASS i1d_08_timeout.json
++PASS i1d_09_fictitious_pii.json
++PASS i1d_10_binary_content.json
++PASS fixture identifiers unique
++--- SELF-TEST (negative mutations) ---
++SELFTEST missing-finalOutcome PASS
++SELFTEST invalid-finalOutcome PASS
++SELFTEST generated-to-rejected PASS
++SELFTEST generated-to-error PASS
++SELFTEST incorrect-http-status PASS
++SELFTEST incorrect-error-code PASS
++SELFTEST invalid-requestId PASS
++SELFTEST inconsistent-requestId PASS
++SELFTEST inconsistent-documentId PASS
++SELFTEST inconsistent-missingFields PASS
++SELFTEST stub-count-mismatch PASS
++SELFTEST duplicate-fixtureId PASS
++SELFTEST missing-pii-markers PASS
++SELFTEST pii-marker-absent-from-payload PASS
++SELFTEST binary-signature-absent PASS
++SELFTEST bad-binary-magic PASS
++SELFTEST step-order-i1c-05 PASS
++SELFTEST e3-http-i1c-05 PASS
++SELFTEST step-order-i1c-02 PASS
++SELFTEST step-order-i1d-05 PASS
++SELFTEST utf8-bom-rejected PASS
++SELFTEST message-place-absent PASS
++SELFTEST message-date-absent PASS
++SELFTEST delta-missing-undeclared PASS
++SELFTEST error-code-absent PASS
++SELFTEST_PASSED=25 SELFTEST_FAILED=0
++PASSED=12 FAILED=0
++RESULT: PASS
++```
++
++| Gate | Statut | Note |
++|---|---|---|
++| G0 | NOT_RUN | Hors lot |
++| G1 | NOT_RUN | `./mvnw verify` non lanc├® |
++| G2 | NOT_RUN | |
++| G3 | NOT_RUN | |
++| G4 | NOT_RUN | |
++| G5 | NOT_RUN | Le validateur statique de ce corpus est PASS (sortie ci-dessus). Aucune validation runtime n'a ├®t├® autoris├®e. La d├®finition G5 (`requirements/N8N_CONTRACTS.md:513-514`) n'a pas ├®t├® ex├®cut├®e |
++| G6 | NOT_RUN | |
++| G7 | NOT_RUN | Revue security non faite |
++| G8 | NOT_RUN | |
++
++Validation statique uniquement. Ce n'est pas une preuve d'ex├®cution n8n.
++
++## RISKS
++
++- ADR-002 reste PROPOS├ë. Le validateur continue de suivre les tableaux E3 = 200. Ce lot ne l'arbitre pas.
++- Le contr├┤le C ne couvre que la phrase `n├®` / `n├®e le <date>` et le lieu qui la suit. Une date ou un lieu ├®crits autrement ne sont pas vus.
++- Backlog, non trait├® : contr├┤le inverse `data` ÔåÆ message, pour signaler une valeur pr├®sente dans l'extraction r├®ussie et absente du message appari├® (donn├®e invent├®e par le LLM).
++- G5 n'est pas acquis : les sc├®narios I-C et I-D de `docs/n8n-orchestration.md` ┬º13 restent hors de ce corpus.
++
++## NEXT_ACTION
++
++Revue fra├«che (reviewer, puis security) sur ce cycle. Ne pas traiter ce rapport comme une validation runtime.
+diff --git a/tests/n8n/FIXTURES_I1.md b/tests/n8n/FIXTURES_I1.md
+new file mode 100644
+index 0000000..f966771
+--- /dev/null
++++ b/tests/n8n/FIXTURES_I1.md
+@@ -0,0 +1,239 @@
++# Fixtures I.1 ÔÇö validation statique
++
++Mission : `DG-I1-FIXTURES-001`.
++
++Mission de correction : `DG-I1-FIXTURES-FIX-001` (assertions de r├®sultat,
++coh├®rence des identifiants, recherche PII sur payload analys├®, signature
++binaire synth├®tique, ordre des ├®tapes, auto-tests n├®gatifs ├á diagnostic
++sp├®cifique).
++
++Ce document d├®crit le lot de **11 fixtures synth├®tiques** et le validateur
++statique associ├®. Il s'agit d'une pr├®paration de tests, **pas d'une preuve
++d'ex├®cution** des gates I-B, I-C ou I-D.
++
++## P├®rim├¿tre
++
++- 5 cas de conversation pour I-C ;
++- 6 cas de panne, idempotence et s├®curit├® pour I-D ;
++- aucune donn├®e personnelle r├®elle ;
++- aucun service, r├®seau, conteneur, mod├¿le Ollama ou workflow n8n ex├®cut├® ;
++- aucune d├®pendance externe : PowerShell 5.1 et JSON uniquement.
++
++Les fixtures sont volontairement stock├®es sous `tests/n8n/fixtures/`. Ce lot ne
++remplace pas les chemins canoniques pr├®vus par les contrats
++(`tests/fixtures/conversation/` et `tests/fixtures/hostile/`) et ne compl├¿te pas
++les checklists exhaustives de `docs/n8n-orchestration.md` ┬º13.
++
++## Fichiers
++
++| Cas | Fichier | Intention | Attendu |
++|---|---|---|---|
++| I1C-01 | `i1c_01_initial_valid.json` | Demande initiale compl├¿te, sans `requestId` | `200 GENERATED`, parcours OLLAMA/E8/E1/E4/E5/E6 |
++| I1C-02 | `i1c_02_second_turn_complete.json` | Deuxi├¿me tour avec `requestId` et champs manquants | `200 GENERATED`, E2 avant extraction delta, puis E3 |
++| I1C-03 | `i1c_03_missing_information.json` | Deux champs obligatoires absents | `200 MISSING_INFORMATION`, E1 en 422, aucun E4/E5/E6 |
++| I1C-04 | `i1c_04_invalid_request_reference.json` | `requestId` volontairement non UUID v4 | `400 INVALID_REQUEST`, `VALIDATION_ERROR`, aucun appel |
++| I1C-05 | `i1c_05_round2_incomplete.json` | Deux tours : E1 422, puis delta partiel et E3 200 encore incomplet | `200 MISSING_INFORMATION`, `missingFields=[lieuNaissance]`, aucun E4/E5/E6 |
++| I1D-05 | `i1d_05_duplicate_message.json` | Deux messages identiques avec le m├¬me `requestId` | `200 GENERATED`, m├¬me `documentId`, E2/E6 deux fois |
++| I1D-06 | `i1d_06_backend_error.json` | E4 renvoie trois fois `500` | `500 ERROR`, `INTERNAL_ERROR` |
++| I1D-07 | `i1d_07_ollama_unavailable.json` | Connexion Ollama refus├®e trois fois | `502 ERROR`, `AI_EXTRACTION_ERROR`, aucun appel backend |
++| I1D-08 | `i1d_08_timeout.json` | Timeout Ollama simul├® trois fois | `502 ERROR`, `AI_EXTRACTION_ERROR`, aucun appel backend |
++| I1D-09 | `i1d_09_fictitious_pii.json` | Marqueurs PII strictement fictifs | Parcours nominal + `securityProbe` PII |
++| I1D-10 | `i1d_10_binary_content.json` | Signature ZIP synth├®tique en base64 | Parcours nominal + `securityProbe` binaire |
++
++## Sch├®ma
++
++Chaque fixture contient les cl├®s suivantes :
++
++| Cl├® | R├┤le |
++|---|---|
++| `schemaVersion` | Version du format, actuellement `1.0` |
++| `fixtureId` | Identifiant stable, par exemple `I1C-01` |
++| `gate` | `I-C` ou `I-D` |
++| `caseNumber` | Num├®ro de cas, unique |
++| `caseKey` | Nom technique stable du cas |
++| `title` / `description` | Description lisible |
++| `synthetic` | Toujours `true` |
++| `input` | Requ├¬te webhook simul├®e : m├®thode, chemin, `correlationId`, ├®v├®nements |
++| `stubs` | R├®ponses simul├®es ordonn├®es des ├®tapes OLLAMA/E8/E1/E2/E3/E4/E5/E6 |
++| `expected` | Statut HTTP final, r├®sultat, erreurs, identifiants, compteurs d'appels |
++| `securityProbe` | Marqueurs PII ou binaire fictifs, ou `null` |
++
++Les ├®v├®nements portent une s├®quence strictement croissante. Un `requestId`
++fourni doit ├¬tre un UUID v4, sauf dans I1C-04 o├╣ il est volontairement invalide.
++Les compteurs `expected.calls` doivent correspondre exactement au nombre de
++stubs par ├®tape.
++
++Codes de r├®sultat utilis├®s : `GENERATED`, `MISSING_INFORMATION`,
++`INVALID_REQUEST` et `ERROR`. Les erreurs attendues sont notamment
++`VALIDATION_ERROR`, `INTERNAL_ERROR` et `AI_EXTRACTION_ERROR`.
++
++## Validateur
++
++Fichier : `tests/n8n/validate_i1_fixtures.ps1`.
++
++V├®rifications :
++
++- pr├®sence exacte des 11 fichiers attendus, sans fichier suppl├®mentaire ;
++- encodage UTF-8 sans BOM et JSON valide ;
++- sch├®ma, identifiants et num├®ros de cas uniques ;
++- m├®thode `POST` et chemin `/webhook/document-generation` ;
++- UUID v4 pour les corr├®lations et r├®f├®rences applicables ;
++- coh├®rence des stubs, des modes et des compteurs d'appels ;
++- coh├®rence entre r├®sultat attendu, statut HTTP et code d'erreur ;
++- r├¿gles sp├®cifiques ├á chaque cas ;
++- absence d├®clar├®e de PII dans les logs et de binaire dans les execution data ;
++- pr├®sence effective des marqueurs PII et de la signature `504B0304` attendue.
++
++### Assertions ajout├®es par DG-I1-FIXTURES-FIX-001
++
++- **FIX-01 ÔÇö contrat m├®tier par fixture.** Un contrat explicite, index├® par
++  `fixtureId`, impose le r├®sultat (`finalOutcome`), le statut HTTP final, le
++  code d'erreur (y compris `null`) et le chemin d'appel ordonn├® exact des stubs
++  (s├®quence des ├®tapes, pas seulement les compteurs).
++- **FIX-02 ÔÇö coh├®rence des identifiants.** Nom du correctif
++  `DG-I1-FIXTURES-FIX-001` : ce n'est pas un code HTTP. Il aligne les
++  identifiants des stubs sur `expected`, et il compare les `missingFields` des
++  stubs OLLAMA (succ├¿s), E1, E3 et E2 ├á `expected.missingFields` (liste
++  backend de l'outcome webhook, ordre et casse compris). Tout `requestId` non
++  nul des ├®v├®nements d'entr├®e et des corps de stubs doit ├¬tre ├®gal ├á
++  `expected.requestId` (sauf I1C-04, volontairement invalide). Tout
++  `documentId` trouv├® r├®cursivement dans les corps de stubs, y compris dans les
++  tableaux `documents[]`, doit ├¬tre ├®gal ├á `expected.documentId`. L'├®tat E2
++  initial de I1C-02 reste l'exception document├®e de cette comparaison. I1C-05
++  conserve l'├®tat du premier tour (`[dateNaissance, lieuNaissance]`) sur la
++  premi├¿re extraction, E1 et E2. E3 d'I1C-05 reste compar├® ├á
++  `expected.missingFields` (`[lieuNaissance]`). Le `caseNumber` de I1C-05 est
++  **11** : 5 est d├®j├á port├® par I1D-05. Son stub E3 est un succ├¿s **200**
++  (T6b), pas un 422.
++- **FIX-02, exemption delta (lot L3).** Structurelle, sans identifiant de
++  fixture. Un tour ÔëÑ 2 est un ├®v├®nement d'entr├®e dont `requestId` est non nul.
++  L'extraction de ce tour est l'OLLAMA en succ├¿s plac├® apr├¿s le premier stub
++  E2 (ordre du contrat : E2, puis extraction delta). Pour ce stub seulement,
++  `missingFields` n'est pas compar├® ├á `expected.missingFields`. Il doit
++  re-d├®clarer, dans l'ordre canonique `prenom`, `nom`, `dateNaissance`,
++  `lieuNaissance`, `nomIncorrect`, `nomCorrect`, toutes les cl├®s obligatoires
++  absentes de son propre `data` (r├¿gle `allOf`, `N8N_CONTRACTS.md` ┬º5).
++  I1C-02 : `["prenom", "nom", "nomIncorrect", "nomCorrect"]`. I1C-05, second
++  OLLAMA : `["prenom", "nom", "lieuNaissance", "nomIncorrect", "nomCorrect"]`.
++  `expected.missingFields` reste la liste backend (`[]` et `[lieuNaissance]`).
++- **FIX-03 ÔÇö payload analys├® pour les PII.** Les marqueurs PII ne sont plus
++  recherch├®s dans la fixture enti├¿re : le validateur construit un payload
++  synth├®tique analys├® ├á partir de `input` et `stubs` uniquement, en excluant
++  totalement `securityProbe`. Les marqueurs doivent ├¬tre au moins au nombre de
++  quatre, non vides, uniques et pr├®sents dans ce payload analys├®.
++- **FIX-04 ÔÇö contenu binaire synth├®tique.** La fixture I1D-10 porte un
++  `documentBase64` synth├®tique (`UEsDBA==`) dans le corps du stub E5. Le
++  validateur d├®code `securityProbe.base64`, exige
++  `expectedMagicHex == "504B0304"`, v├®rifie que les octets d├®cod├®s commencent
++  par cette signature et que la m├¬me cha├«ne base64 figure dans le payload
++  analys├® (`input` + `stubs`). Aucun document r├®el n'est utilis├®.
++- **FIX-05 ÔÇö ordre des ├®tapes.** I1C-02 doit appeler E2 avant l'extraction
++  OLLAMA et avant E3. I1C-05 doit appeler E2 avant la seconde extraction
++  OLLAMA et avant E3. I1D-05 doit appeler E2 en premier et chaque E6 doit
++  suivre une g├®n├®ration E2 (s├®mantique de tour).
++- **FIX-06 ÔÇö auto-tests ├á diagnostic sp├®cifique.** Chaque mutation n├®gative
++  v├®rifie la pr├®sence du diagnostic attendu, et non simplement l'existence
++  d'une erreur.
++
++Le mode `-SelfTest` applique vingt-cinq mutations n├®gatives en m├®moire et
++v├®rifie que le validateur les rejette avec le diagnostic attendu. Les deux
++ajouts du lot L1 portent sur I1C-05 : ordre E2 avant la seconde extraction, et
++refus d'un E3 qui ne serait pas un succ├¿s 200. Le lot L3 en ajoute quatre :
++`message-place-absent`, `message-date-absent`, `delta-missing-undeclared`,
++`error-code-absent`. Aucun fichier temporaire n'est ├®crit.
++
++## Ex├®cution
++
++Validation statique :
++
++```powershell
++powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\n8n\validate_i1_fixtures.ps1
++```
++
++Validation statique avec auto-tests n├®gatifs :
++
++```powershell
++powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\n8n\validate_i1_fixtures.ps1 -SelfTest
++```
++
++Un autre r├®pertoire peut ├¬tre fourni avec `-FixtureDir`.
++
++Codes de sortie :
++
++- `0` : toutes les v├®rifications passent ;
++- `1` : au moins une v├®rification ou un auto-test ├®choue ;
++- `2` : r├®pertoire absent ou illisible.
++
++R├®sultat de r├®f├®rence du 2026-10-24 (lot L3) :
++
++```text
++PASSED=12 FAILED=0
++SELFTEST_PASSED=25 SELFTEST_FAILED=0
++RESULT: PASS
++```
++
++## Lot L3 ÔÇö coh├®rence message, delta et `code`
++
++### Motif de naissance (contr├┤le C)
++
++Le validateur n'inspecte que la phrase de naissance, jamais un ┬½ ├á ┬╗ isol├®
++(┬½ ├Ç partir de ┬╗ ne matche pas). Motif, insensible ├á `N├®` / `N├®e` :
++
++- date : `n├®` ou `n├®e`, puis `le`, puis `jj/mm/aaaa` ou `jj-mm-aaaa` ;
++- lieu : la m├¬me phrase suivie de `├á` minuscule puis d'un mot commen├ºant par
++  une majuscule (`Ville-Fictive`).
++
++La date du message est compar├®e ├á `data.dateNaissance` en `yyyy-MM-dd`. Le mot
++est compar├® ├á `data.lieuNaissance`. L'appariement se fait depuis la fin entre
++les ├®v├®nements et les OLLAMA en succ├¿s. Sans extraction r├®ussie, le contr├┤le
++ne s'applique pas.
++
++| Fixture | Extraction r├®ussie | Contr├┤le |
++|---|---|---|
++| I1C-01 | une, tour 1 | s'applique : `01/01/1980` et `Ville-Fictive` sont dans `data` ; passe |
++| I1C-02 | une, apr├¿s E2 (├®v├®nement 2) | s'applique sur ┬½ n├®e le 01/01/1980 ├á Ville-Fictive ┬╗ ; passe. L'├®v├®nement 1 n'a pas d'extraction appari├®e |
++| I1C-03 | une, tour 1 | phrase de naissance absente ; contr├┤le non d├®clench├® ; passe |
++| I1C-05 | deux | ├®v├®nement 1 : phrase absente, non d├®clench├®. ├ëv├®nement 2 : `N├®e le 01/01/1980` correspond ├á `1980-01-01` ; pas de `├á <Mot>` ; passe |
++| I1D-06 | une, tour 1 | s'applique : date et `Ville-Fictive` dans `data` ; passe |
++| I1D-09 | une, tour 1 | s'applique sur la phrase de naissance, qui est dans `data` ; passe. Passeport et courriel hors motif |
++| I1D-10 | une, tour 1 | s'applique : date et `Ville-Fictive` dans `data` ; passe |
++
++Aucune fixture hostile n'a ├®t├® modifi├®e pour ce contr├┤le.
++
++### Corps 422 (contr├┤le B)
++
++Les stubs E1 en `422` d'I1C-03 et d'I1C-05 portent
++`"code": "MISSING_INFORMATION"` (`API_CONTRACTS.md` ┬º2.3 et ┬º3.1). Statut,
++HTTP et `expected` inchang├®s. Aucun corps backend `400` dans ce corpus. Le
++`400` d'E8 reste un `ExtractionValidationResponse`, hors de cette r├¿gle.
++
++### I1D-09 ÔÇö marqueurs de sonde
++
++`securityProbe.markers` contient `FAKE-PP-0001` et `fictif@example.invalid`
++(`i1d_09_fictitious_pii.json`, cl├®s du tableau `markers`). Le validateur
++exige chaque marqueur comme sous-cha├«ne du payload analys├® (`input` + `stubs`
++uniquement, `securityProbe` exclu). Il n'exige pas que la valeur soit dans
++`data`. Les deux cha├«nes sont dans le message d'entr├®e ; cela suffit.
++
++`contactEmail` est une cl├® valide de `data` (`requirements/API_CONTRACTS.md`
++┬º2.1, exemple ligne 95). L'absence de `fictif@example.invalid` dans le `data`
++OLLAMA est une **simulation d├®lib├®r├®e** d'un LLM qui n'extrait pas un champ
++optionnel. Le prompt d'extraction, contrainte 4
++(`prompts/extraction/system_prompt_attestation_concordance.md` lignes 24-28),
++n'inscrit dans `missingFields` que les six cl├®s obligatoires ; une cl├®
++optionnelle non ├®mise reste absente de `data`. Seul `FAKE-PP-0001` est une
++cl├® inconnue : `passeport` n'est pas une cl├® du sch├®ma (pilote, sc├®nario S12).
++
++## Limites
++
++Ce validateur prouve uniquement la coh├®rence statique du corpus. Il ne prouve
++pas :
++
++- l'ex├®cution r├®elle du workflow n8n ;
++- le respect effectif des retries, timeouts et de l'ordre des appels ;
++- le comportement du backend Spring Boot ou de PostgreSQL ;
++- l'absence r├®elle de PII dans les logs n8n ;
++- l'absence r├®elle de binaire dans les execution data ;
++- la couverture compl├¿te des gates I-C et I-D.
++
++Ces points restent ├á couvrir par des tests d'ex├®cution explicitement autoris├®s.
+diff --git a/tests/n8n/fixtures/i1c_01_initial_valid.json b/tests/n8n/fixtures/i1c_01_initial_valid.json
+new file mode 100644
+index 0000000..2817e06
+--- /dev/null
++++ b/tests/n8n/fixtures/i1c_01_initial_valid.json
+@@ -0,0 +1,118 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1C-01",
++  "gate": "I-C",
++  "caseNumber": 1,
++  "caseKey": "initial_valid",
++  "title": "Conversation initiale valide",
++  "description": "Message initial sans requestId contenant les six champs obligatoires ; le workflow doit produire un document.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "11111111-1111-4111-8111-111111111111",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, n├®e le 01/01/1980 ├á Ville-Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive, pour un dossier fictif de test.",
++          "requestId": null
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "OLLAMA",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentType": "ATTESTATION_CONCORDANCE",
++        "confidence": 0.97,
++        "data": {
++          "prenom": "Camille",
++          "nom": "Fictive",
++          "dateNaissance": "1980-01-01",
++          "lieuNaissance": "Ville-Fictive",
++          "nomIncorrect": "Camil Fictif",
++          "nomCorrect": "Camille Fictive",
++          "motif": "Dossier fictif de test"
++        },
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E8",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "valid": true
++      }
++    },
++    {
++      "stage": "E1",
++      "mode": "success",
++      "httpStatus": 201,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E4",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED"
++      }
++    },
++    {
++      "stage": "E5",
++      "mode": "success",
++      "httpStatus": 201,
++      "delayMs": 0,
++      "body": {
++        "status": "GENERATED",
++        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
++      }
++    },
++    {
++      "stage": "E6",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
++      }
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 200,
++    "finalOutcome": "GENERATED",
++    "errorCode": null,
++    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++    "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 1,
++      "E8": 1,
++      "E1": 1,
++      "E2": 0,
++      "E3": 0,
++      "E4": 1,
++      "E5": 1,
++      "E6": 1
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+diff --git a/tests/n8n/fixtures/i1c_02_second_turn_complete.json b/tests/n8n/fixtures/i1c_02_second_turn_complete.json
+new file mode 100644
+index 0000000..f550001
+--- /dev/null
++++ b/tests/n8n/fixtures/i1c_02_second_turn_complete.json
+@@ -0,0 +1,133 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1C-02",
++  "gate": "I-C",
++  "caseNumber": 2,
++  "caseKey": "second_turn_complete",
++  "title": "Deuxi├¿me tour avec informations compl├®mentaires",
++  "description": "Le client renvoie le requestId et fournit les champs manquants ; E2 est consult├® avant l'extraction delta puis E3 compl├¿te la demande.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "22222222-2222-4222-8222-222222222222",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
++          "requestId": null
++        }
++      },
++      {
++        "sequence": 2,
++        "body": {
++          "message": "Compl├®ment fictif : n├®e le 01/01/1980 ├á Ville-Fictive, dossier fictif de test.",
++          "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "E2",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "MISSING_INFORMATION",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": ["dateNaissance", "lieuNaissance"],
++        "data": {}
++      }
++    },
++    {
++      "stage": "OLLAMA",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentType": "ATTESTATION_CONCORDANCE",
++        "confidence": 0.95,
++        "data": {
++          "dateNaissance": "1980-01-01",
++          "lieuNaissance": "Ville-Fictive",
++          "motif": "Dossier fictif de test"
++        },
++        "missingFields": ["prenom", "nom", "nomIncorrect", "nomCorrect"]
++      }
++    },
++    {
++      "stage": "E8",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "valid": true
++      }
++    },
++    {
++      "stage": "E3",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E4",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED"
++      }
++    },
++    {
++      "stage": "E5",
++      "mode": "success",
++      "httpStatus": 201,
++      "delayMs": 0,
++      "body": {
++        "status": "GENERATED",
++        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
++      }
++    },
++    {
++      "stage": "E6",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
++      }
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 200,
++    "finalOutcome": "GENERATED",
++    "errorCode": null,
++    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++    "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 1,
++      "E8": 1,
++      "E1": 0,
++      "E2": 1,
++      "E3": 1,
++      "E4": 1,
++      "E5": 1,
++      "E6": 1
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+diff --git a/tests/n8n/fixtures/i1c_03_missing_information.json b/tests/n8n/fixtures/i1c_03_missing_information.json
+new file mode 100644
+index 0000000..0b1c84e
+--- /dev/null
++++ b/tests/n8n/fixtures/i1c_03_missing_information.json
+@@ -0,0 +1,88 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1C-03",
++  "gate": "I-C",
++  "caseNumber": 3,
++  "caseKey": "missing_information",
++  "title": "Informations manquantes",
++  "description": "L'extraction d├®tecte deux champs obligatoires absents ; E1 renvoie 422 et le workflow expose MISSING_INFORMATION sans inventer de valeur.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "33333333-3333-4333-8333-333333333333",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
++          "requestId": null
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "OLLAMA",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentType": "ATTESTATION_CONCORDANCE",
++        "confidence": 0.93,
++        "data": {
++          "prenom": "Camille",
++          "nom": "Fictive",
++          "nomIncorrect": "Camil Fictif",
++          "nomCorrect": "Camille Fictive"
++        },
++        "missingFields": ["dateNaissance", "lieuNaissance"]
++      }
++    },
++    {
++      "stage": "E8",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "valid": true
++      }
++    },
++    {
++      "stage": "E1",
++      "mode": "error",
++      "httpStatus": 422,
++      "delayMs": 0,
++      "body": {
++        "code": "MISSING_INFORMATION",
++        "status": "MISSING_INFORMATION",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": ["dateNaissance", "lieuNaissance"]
++      }
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 200,
++    "finalOutcome": "MISSING_INFORMATION",
++    "errorCode": null,
++    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++    "documentId": null,
++    "missingFields": ["dateNaissance", "lieuNaissance"],
++    "calls": {
++      "OLLAMA": 1,
++      "E8": 1,
++      "E1": 1,
++      "E2": 0,
++      "E3": 0,
++      "E4": 0,
++      "E5": 0,
++      "E6": 0
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+diff --git a/tests/n8n/fixtures/i1c_04_invalid_request_reference.json b/tests/n8n/fixtures/i1c_04_invalid_request_reference.json
+new file mode 100644
+index 0000000..ecfd75b
+--- /dev/null
++++ b/tests/n8n/fixtures/i1c_04_invalid_request_reference.json
+@@ -0,0 +1,49 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1C-04",
++  "gate": "I-C",
++  "caseNumber": 4,
++  "caseKey": "invalid_request_reference",
++  "title": "R├®f├®rence de demande invalide",
++  "description": "Le requestId fourni ne respecte pas le format UUID v4 ; le workflow doit rejeter l'ingress sans appel backend.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "44444444-4444-4444-8444-444444444444",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "Compl├®ment fictif avec une r├®f├®rence de demande volontairement invalide.",
++          "requestId": "ref-invalide-001"
++        }
++      }
++    ]
++  },
++  "stubs": [],
++  "expected": {
++    "finalHttpStatus": 400,
++    "finalOutcome": "INVALID_REQUEST",
++    "errorCode": "VALIDATION_ERROR",
++    "requestId": null,
++    "documentId": null,
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 0,
++      "E8": 0,
++      "E1": 0,
++      "E2": 0,
++      "E3": 0,
++      "E4": 0,
++      "E5": 0,
++      "E6": 0
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+diff --git a/tests/n8n/fixtures/i1c_05_round2_incomplete.json b/tests/n8n/fixtures/i1c_05_round2_incomplete.json
+new file mode 100644
+index 0000000..fe5b880
+--- /dev/null
++++ b/tests/n8n/fixtures/i1c_05_round2_incomplete.json
+@@ -0,0 +1,141 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1C-05",
++  "gate": "I-C",
++  "caseNumber": 11,
++  "caseKey": "round2_incomplete",
++  "title": "Deuxi├¿me tour avec delta partiel",
++  "description": "Le client fournit uniquement la date de naissance ; le lieu de naissance reste absent. Le workflow doit retourner MISSING_INFORMATION avec lieuNaissance.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "55555555-5555-4555-8555-555555555555",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
++          "requestId": null
++        }
++      },
++      {
++        "sequence": 2,
++        "body": {
++          "message": "N├®e le 01/01/1980.",
++          "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "OLLAMA",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentType": "ATTESTATION_CONCORDANCE",
++        "confidence": 0.93,
++        "data": {
++          "prenom": "Camille",
++          "nom": "Fictive",
++          "nomIncorrect": "Camil Fictif",
++          "nomCorrect": "Camille Fictive"
++        },
++        "missingFields": ["dateNaissance", "lieuNaissance"]
++      }
++    },
++    {
++      "stage": "E8",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "valid": true
++      }
++    },
++    {
++      "stage": "E1",
++      "mode": "error",
++      "httpStatus": 422,
++      "delayMs": 0,
++      "body": {
++        "code": "MISSING_INFORMATION",
++        "status": "MISSING_INFORMATION",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": ["dateNaissance", "lieuNaissance"]
++      }
++    },
++    {
++      "stage": "E2",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "MISSING_INFORMATION",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": ["dateNaissance", "lieuNaissance"],
++        "data": {}
++      }
++    },
++    {
++      "stage": "OLLAMA",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentType": "ATTESTATION_CONCORDANCE",
++        "confidence": 0.95,
++        "data": {
++          "dateNaissance": "1980-01-01"
++        },
++        "missingFields": ["prenom", "nom", "lieuNaissance", "nomIncorrect", "nomCorrect"]
++      }
++    },
++    {
++      "stage": "E8",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "valid": true
++      }
++    },
++    {
++      "stage": "E3",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "MISSING_INFORMATION",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": ["lieuNaissance"]
++      }
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 200,
++    "finalOutcome": "MISSING_INFORMATION",
++    "errorCode": null,
++    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++    "documentId": null,
++    "missingFields": ["lieuNaissance"],
++    "calls": {
++      "OLLAMA": 2,
++      "E8": 2,
++      "E1": 1,
++      "E2": 1,
++      "E3": 1,
++      "E4": 0,
++      "E5": 0,
++      "E6": 0
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+\ No newline at end of file
+diff --git a/tests/n8n/fixtures/i1d_05_duplicate_message.json b/tests/n8n/fixtures/i1d_05_duplicate_message.json
+new file mode 100644
+index 0000000..bc095d9
+--- /dev/null
++++ b/tests/n8n/fixtures/i1d_05_duplicate_message.json
+@@ -0,0 +1,112 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1D-05",
++  "gate": "I-D",
++  "caseNumber": 5,
++  "caseKey": "duplicate_message",
++  "title": "Message utilisateur dupliqu├®",
++  "description": "Deux webhooks identiques portent le m├¬me requestId ; E2 est consult├® en t├¬te et le m├¬me document est retourn├® sans nouvelle cr├®ation.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "55555555-5555-4555-8555-555555555555",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "Relance fictive de la demande existante.",
++          "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
++        }
++      },
++      {
++        "sequence": 2,
++        "body": {
++          "message": "Relance fictive de la demande existante.",
++          "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "E2",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "GENERATED",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": [],
++        "documents": [
++          {
++            "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++            "generatedAt": "2026-01-01T00:00:00Z"
++          }
++        ]
++      }
++    },
++    {
++      "stage": "E6",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
++      }
++    },
++    {
++      "stage": "E2",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "GENERATED",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": [],
++        "documents": [
++          {
++            "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++            "generatedAt": "2026-01-01T00:00:00Z"
++          }
++        ]
++      }
++    },
++    {
++      "stage": "E6",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
++      }
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 200,
++    "finalOutcome": "GENERATED",
++    "errorCode": null,
++    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++    "documentId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 0,
++      "E8": 0,
++      "E1": 0,
++      "E2": 2,
++      "E3": 0,
++      "E4": 0,
++      "E5": 0,
++      "E6": 2
++    },
++    "idempotency": {
++      "key": "same-requestId",
++      "sameDocumentId": true
++    },
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+diff --git a/tests/n8n/fixtures/i1d_06_backend_error.json b/tests/n8n/fixtures/i1d_06_backend_error.json
+new file mode 100644
+index 0000000..49a760f
+--- /dev/null
++++ b/tests/n8n/fixtures/i1d_06_backend_error.json
+@@ -0,0 +1,119 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1D-06",
++  "gate": "I-D",
++  "caseNumber": 6,
++  "caseKey": "backend_error",
++  "title": "R├®ponse backend simul├®e en erreur",
++  "description": "E4 renvoie trois fois un 5xx re├ºu ; le workflow doit retourner 500 INTERNAL_ERROR sans exposer de stack trace.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "66666666-6666-4666-8666-666666666666",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, n├®e le 01/01/1980 ├á Ville-Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
++          "requestId": null
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "OLLAMA",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentType": "ATTESTATION_CONCORDANCE",
++        "confidence": 0.96,
++        "data": {
++          "prenom": "Camille",
++          "nom": "Fictive",
++          "dateNaissance": "1980-01-01",
++          "lieuNaissance": "Ville-Fictive",
++          "nomIncorrect": "Camil Fictif",
++          "nomCorrect": "Camille Fictive"
++        },
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E8",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "valid": true
++      }
++    },
++    {
++      "stage": "E1",
++      "mode": "success",
++      "httpStatus": 201,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED",
++        "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E4",
++      "mode": "error",
++      "httpStatus": 500,
++      "delayMs": 0,
++      "body": {
++        "code": "INTERNAL_ERROR",
++        "message": "Simulated backend failure"
++      }
++    },
++    {
++      "stage": "E4",
++      "mode": "error",
++      "httpStatus": 500,
++      "delayMs": 0,
++      "body": {
++        "code": "INTERNAL_ERROR",
++        "message": "Simulated backend failure"
++      }
++    },
++    {
++      "stage": "E4",
++      "mode": "error",
++      "httpStatus": 500,
++      "delayMs": 0,
++      "body": {
++        "code": "INTERNAL_ERROR",
++        "message": "Simulated backend failure"
++      }
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 500,
++    "finalOutcome": "ERROR",
++    "errorCode": "INTERNAL_ERROR",
++    "requestId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++    "documentId": null,
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 1,
++      "E8": 1,
++      "E1": 1,
++      "E2": 0,
++      "E3": 0,
++      "E4": 3,
++      "E5": 0,
++      "E6": 0
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+diff --git a/tests/n8n/fixtures/i1d_07_ollama_unavailable.json b/tests/n8n/fixtures/i1d_07_ollama_unavailable.json
+new file mode 100644
+index 0000000..0c6f2c1
+--- /dev/null
++++ b/tests/n8n/fixtures/i1d_07_ollama_unavailable.json
+@@ -0,0 +1,71 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1D-07",
++  "gate": "I-D",
++  "caseNumber": 7,
++  "caseKey": "ollama_unavailable",
++  "title": "Ollama indisponible (simulation)",
++  "description": "Le stub Ollama refuse la connexion trois fois ; aucun appel backend ne doit ├¬tre ├®mis et le workflow doit retourner 502 AI_EXTRACTION_ERROR.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "77777777-7777-4777-8777-777777777777",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, n├®e le 01/01/1980 ├á Ville-Fictive.",
++          "requestId": null
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "OLLAMA",
++      "mode": "connection_refused",
++      "httpStatus": null,
++      "delayMs": 0,
++      "body": null
++    },
++    {
++      "stage": "OLLAMA",
++      "mode": "connection_refused",
++      "httpStatus": null,
++      "delayMs": 0,
++      "body": null
++    },
++    {
++      "stage": "OLLAMA",
++      "mode": "connection_refused",
++      "httpStatus": null,
++      "delayMs": 0,
++      "body": null
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 502,
++    "finalOutcome": "ERROR",
++    "errorCode": "AI_EXTRACTION_ERROR",
++    "requestId": null,
++    "documentId": null,
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 3,
++      "E8": 0,
++      "E1": 0,
++      "E2": 0,
++      "E3": 0,
++      "E4": 0,
++      "E5": 0,
++      "E6": 0
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+diff --git a/tests/n8n/fixtures/i1d_08_timeout.json b/tests/n8n/fixtures/i1d_08_timeout.json
+new file mode 100644
+index 0000000..3a8c65b
+--- /dev/null
++++ b/tests/n8n/fixtures/i1d_08_timeout.json
+@@ -0,0 +1,71 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1D-08",
++  "gate": "I-D",
++  "caseNumber": 8,
++  "caseKey": "timeout",
++  "title": "Timeout simul├®",
++  "description": "Le stub Ollama ne r├®pond pas avant la borne simul├®e, trois fois ; aucun appel backend ne doit ├¬tre ├®mis et le workflow doit retourner 502 AI_EXTRACTION_ERROR.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "88888888-8888-4888-8888-888888888888",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, n├®e le 01/01/1980 ├á Ville-Fictive.",
++          "requestId": null
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "OLLAMA",
++      "mode": "timeout",
++      "httpStatus": null,
++      "delayMs": 60000,
++      "body": null
++    },
++    {
++      "stage": "OLLAMA",
++      "mode": "timeout",
++      "httpStatus": null,
++      "delayMs": 60000,
++      "body": null
++    },
++    {
++      "stage": "OLLAMA",
++      "mode": "timeout",
++      "httpStatus": null,
++      "delayMs": 60000,
++      "body": null
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 502,
++    "finalOutcome": "ERROR",
++    "errorCode": "AI_EXTRACTION_ERROR",
++    "requestId": null,
++    "documentId": null,
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 3,
++      "E8": 0,
++      "E1": 0,
++      "E2": 0,
++      "E3": 0,
++      "E4": 0,
++      "E5": 0,
++      "E6": 0
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": null
++}
+diff --git a/tests/n8n/fixtures/i1d_09_fictitious_pii.json b/tests/n8n/fixtures/i1d_09_fictitious_pii.json
+new file mode 100644
+index 0000000..8d7cd92
+--- /dev/null
++++ b/tests/n8n/fixtures/i1d_09_fictitious_pii.json
+@@ -0,0 +1,127 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1D-09",
++  "gate": "I-D",
++  "caseNumber": 9,
++  "caseKey": "fictitious_pii",
++  "title": "Pr├®sence de donn├®es personnelles fictives",
++  "description": "Le message contient des marqueurs PII strictement fictifs ; les scans doivent pouvoir v├®rifier leur absence dans les logs et les donn├®es d'ex├®cution.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "99999999-9999-4999-8999-999999999999",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, n├®e le 01/01/1980 ├á Ville-Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive. Passeport fictif FAKE-PP-0001, courriel fictif fictif@example.invalid.",
++          "requestId": null
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "OLLAMA",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentType": "ATTESTATION_CONCORDANCE",
++        "confidence": 0.98,
++        "data": {
++          "prenom": "Camille",
++          "nom": "Fictive",
++          "dateNaissance": "1980-01-01",
++          "lieuNaissance": "Ville-Fictive",
++          "nomIncorrect": "Camil Fictif",
++          "nomCorrect": "Camille Fictive"
++        },
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E8",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "valid": true
++      }
++    },
++    {
++      "stage": "E1",
++      "mode": "success",
++      "httpStatus": 201,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED",
++        "requestId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E4",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED"
++      }
++    },
++    {
++      "stage": "E5",
++      "mode": "success",
++      "httpStatus": 201,
++      "delayMs": 0,
++      "body": {
++        "status": "GENERATED",
++        "documentId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
++      }
++    },
++    {
++      "stage": "E6",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
++      }
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 200,
++    "finalOutcome": "GENERATED",
++    "errorCode": null,
++    "requestId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
++    "documentId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 1,
++      "E8": 1,
++      "E1": 1,
++      "E2": 0,
++      "E3": 0,
++      "E4": 1,
++      "E5": 1,
++      "E6": 1
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": {
++    "kind": "pii",
++    "piiNotice": "Toutes les valeurs sont fictives et r├®serv├®es aux tests statiques.",
++    "markers": [
++      "Camille Fictive",
++      "1980-01-01",
++      "Ville-Fictive",
++      "FAKE-PP-0001",
++      "fictif@example.invalid"
++    ]
++  }
++}
+diff --git a/tests/n8n/fixtures/i1d_10_binary_content.json b/tests/n8n/fixtures/i1d_10_binary_content.json
+new file mode 100644
+index 0000000..71c8cf3
+--- /dev/null
++++ b/tests/n8n/fixtures/i1d_10_binary_content.json
+@@ -0,0 +1,123 @@
++{
++  "schemaVersion": "1.0",
++  "fixtureId": "I1D-10",
++  "gate": "I-D",
++  "caseNumber": 10,
++  "caseKey": "binary_content",
++  "title": "Pr├®sence de contenu binaire simul├®",
++  "description": "Le fixture porte une signature ZIP synth├®tique encod├®e en base64 pour pr├®parer le scan des donn├®es d'ex├®cution ; aucun binaire r├®el n'est inclus.",
++  "synthetic": true,
++  "input": {
++    "method": "POST",
++    "path": "/webhook/document-generation",
++    "correlationId": "12121212-1212-4212-8212-121212121212",
++    "events": [
++      {
++        "sequence": 1,
++        "body": {
++          "message": "G├®n├¿re une attestation de concordance pour Camille Fictive, n├®e le 01/01/1980 ├á Ville-Fictive, nom incorrect Camil Fictif, nom correct Camille Fictive.",
++          "requestId": null
++        }
++      }
++    ]
++  },
++  "stubs": [
++    {
++      "stage": "OLLAMA",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentType": "ATTESTATION_CONCORDANCE",
++        "confidence": 0.97,
++        "data": {
++          "prenom": "Camille",
++          "nom": "Fictive",
++          "dateNaissance": "1980-01-01",
++          "lieuNaissance": "Ville-Fictive",
++          "nomIncorrect": "Camil Fictif",
++          "nomCorrect": "Camille Fictive"
++        },
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E8",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "valid": true
++      }
++    },
++    {
++      "stage": "E1",
++      "mode": "success",
++      "httpStatus": 201,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED",
++        "requestId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
++        "missingFields": []
++      }
++    },
++    {
++      "stage": "E4",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "status": "VALIDATED"
++      }
++    },
++    {
++      "stage": "E5",
++      "mode": "success",
++      "httpStatus": 201,
++      "delayMs": 0,
++      "body": {
++        "status": "GENERATED",
++        "documentId": "12121212-1212-4212-8212-121212121212",
++        "documentBase64": "UEsDBA=="
++      }
++    },
++    {
++      "stage": "E6",
++      "mode": "success",
++      "httpStatus": 200,
++      "delayMs": 0,
++      "body": {
++        "documentId": "12121212-1212-4212-8212-121212121212"
++      }
++    }
++  ],
++  "expected": {
++    "finalHttpStatus": 200,
++    "finalOutcome": "GENERATED",
++    "errorCode": null,
++    "requestId": "ffffffff-ffff-4fff-8fff-ffffffffffff",
++    "documentId": "12121212-1212-4212-8212-121212121212",
++    "missingFields": [],
++    "calls": {
++      "OLLAMA": 1,
++      "E8": 1,
++      "E1": 1,
++      "E2": 0,
++      "E3": 0,
++      "E4": 1,
++      "E5": 1,
++      "E6": 1
++    },
++    "idempotency": null,
++    "securityScan": {
++      "piiInLogs": false,
++      "binaryInExecutionData": false
++    }
++  },
++  "securityProbe": {
++    "kind": "binary",
++    "base64": "UEsDBA==",
++    "expectedMagicHex": "504B0304",
++    "note": "Signature ZIP synthetique encodee en base64 ; aucun fichier binaire reel."
++  }
++}
+diff --git a/tests/n8n/validate_i1_fixtures.ps1 b/tests/n8n/validate_i1_fixtures.ps1
+new file mode 100644
+index 0000000..260b9f3
+--- /dev/null
++++ b/tests/n8n/validate_i1_fixtures.ps1
+@@ -0,0 +1,1280 @@
++<#
++.SYNOPSIS
++  Static validator for the synthetic DG-I1-FIXTURES-001 conversation fixtures.
++
++.DESCRIPTION
++  STATIC ONLY. This script reads JSON fixtures under tests/n8n/fixtures and
++  validates their shape, naming, UTF-8 encoding, case coverage and internal
++  consistency. It never starts a service, never uses the network and never
++  executes an n8n workflow.
++
++  The fixture expectations are test intent, not runtime proof. In particular,
++  this validator does NOT prove gates I-B, I-C or I-D.
++
++  With -SelfTest, the script also mutates loaded fixtures in memory and asserts
++  that the validator rejects them. No temporary file is written.
++
++  Exit codes:
++    0 = every check passed (and self-tests passed when requested)
++    1 = at least one check or self-test failed
++    2 = the fixture directory is missing or unreadable
++#>
++[CmdletBinding()]
++param(
++    [string]$FixtureDir,
++    [switch]$SelfTest
++)
++
++$ErrorActionPreference = 'Stop'
++
++if ([string]::IsNullOrWhiteSpace($FixtureDir)) {
++    $FixtureDir = Join-Path $PSScriptRoot 'fixtures'
++}
++
++$script:Failures = 0
++$script:Passed = 0
++$script:SelfTestPassed = 0
++$script:SelfTestFailed = 0
++
++$script:Stages = @('OLLAMA', 'E8', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6')
++$script:Outcomes = @(
++    'GENERATED', 'MISSING_INFORMATION', 'REJECTED', 'GENERATION_FAILED',
++    'REQUEST_NOT_FOUND', 'UNSUPPORTED_DOCUMENT_TYPE', 'CLARIFICATION_LIMIT_REACHED',
++    'INVALID_REQUEST', 'ERROR'
++)
++$script:ErrorCodes = @(
++    'VALIDATION_ERROR', 'AI_EXTRACTION_ERROR', 'EXTRACTION_SCHEMA_INVALID',
++    'BACKEND_UNAVAILABLE', 'INTERNAL_ERROR', 'REQUEST_NOT_FOUND'
++)
++
++$script:CaseOrder = @(
++    'I1C-01', 'I1C-02', 'I1C-03', 'I1C-04', 'I1C-05',
++    'I1D-05', 'I1D-06', 'I1D-07', 'I1D-08', 'I1D-09', 'I1D-10'
++)
++$script:CaseSpec = @{
++    'I1C-01' = [pscustomobject]@{ File = 'i1c_01_initial_valid.json'; Gate = 'I-C'; CaseNumber = 1; CaseKey = 'initial_valid' }
++    'I1C-02' = [pscustomobject]@{ File = 'i1c_02_second_turn_complete.json'; Gate = 'I-C'; CaseNumber = 2; CaseKey = 'second_turn_complete' }
++    'I1C-03' = [pscustomobject]@{ File = 'i1c_03_missing_information.json'; Gate = 'I-C'; CaseNumber = 3; CaseKey = 'missing_information' }
++    'I1C-04' = [pscustomobject]@{ File = 'i1c_04_invalid_request_reference.json'; Gate = 'I-C'; CaseNumber = 4; CaseKey = 'invalid_request_reference' }
++    'I1C-05' = [pscustomobject]@{ File = 'i1c_05_round2_incomplete.json'; Gate = 'I-C'; CaseNumber = 11; CaseKey = 'round2_incomplete' }
++    'I1D-05' = [pscustomobject]@{ File = 'i1d_05_duplicate_message.json'; Gate = 'I-D'; CaseNumber = 5; CaseKey = 'duplicate_message' }
++    'I1D-06' = [pscustomobject]@{ File = 'i1d_06_backend_error.json'; Gate = 'I-D'; CaseNumber = 6; CaseKey = 'backend_error' }
++    'I1D-07' = [pscustomobject]@{ File = 'i1d_07_ollama_unavailable.json'; Gate = 'I-D'; CaseNumber = 7; CaseKey = 'ollama_unavailable' }
++    'I1D-08' = [pscustomobject]@{ File = 'i1d_08_timeout.json'; Gate = 'I-D'; CaseNumber = 8; CaseKey = 'timeout' }
++    'I1D-09' = [pscustomobject]@{ File = 'i1d_09_fictitious_pii.json'; Gate = 'I-D'; CaseNumber = 9; CaseKey = 'fictitious_pii' }
++    'I1D-10' = [pscustomobject]@{ File = 'i1d_10_binary_content.json'; Gate = 'I-D'; CaseNumber = 10; CaseKey = 'binary_content' }
++}
++
++# FIX-01: approved business contract per fixture. These are the expected
++# results an execution would have to satisfy; the ordered Path is the exact
++# sequence of simulated stub stages, not merely per-stage counts.
++$script:Contracts = @{
++    'I1C-01' = [pscustomobject]@{ Outcome = 'GENERATED'; HttpStatus = 200; ErrorCode = $null; Path = @('OLLAMA', 'E8', 'E1', 'E4', 'E5', 'E6') }
++    'I1C-02' = [pscustomobject]@{ Outcome = 'GENERATED'; HttpStatus = 200; ErrorCode = $null; Path = @('E2', 'OLLAMA', 'E8', 'E3', 'E4', 'E5', 'E6') }
++    'I1C-03' = [pscustomobject]@{ Outcome = 'MISSING_INFORMATION'; HttpStatus = 200; ErrorCode = $null; Path = @('OLLAMA', 'E8', 'E1') }
++    'I1C-04' = [pscustomobject]@{ Outcome = 'INVALID_REQUEST'; HttpStatus = 400; ErrorCode = 'VALIDATION_ERROR'; Path = @() }
++    'I1C-05' = [pscustomobject]@{ Outcome = 'MISSING_INFORMATION'; HttpStatus = 200; ErrorCode = $null; Path = @('OLLAMA', 'E8', 'E1', 'E2', 'OLLAMA', 'E8', 'E3') }
++    'I1D-05' = [pscustomobject]@{ Outcome = 'GENERATED'; HttpStatus = 200; ErrorCode = $null; Path = @('E2', 'E6', 'E2', 'E6') }
++    'I1D-06' = [pscustomobject]@{ Outcome = 'ERROR'; HttpStatus = 500; ErrorCode = 'INTERNAL_ERROR'; Path = @('OLLAMA', 'E8', 'E1', 'E4', 'E4', 'E4') }
++    'I1D-07' = [pscustomobject]@{ Outcome = 'ERROR'; HttpStatus = 502; ErrorCode = 'AI_EXTRACTION_ERROR'; Path = @('OLLAMA', 'OLLAMA', 'OLLAMA') }
++    'I1D-08' = [pscustomobject]@{ Outcome = 'ERROR'; HttpStatus = 502; ErrorCode = 'AI_EXTRACTION_ERROR'; Path = @('OLLAMA', 'OLLAMA', 'OLLAMA') }
++    'I1D-09' = [pscustomobject]@{ Outcome = 'GENERATED'; HttpStatus = 200; ErrorCode = $null; Path = @('OLLAMA', 'E8', 'E1', 'E4', 'E5', 'E6') }
++    'I1D-10' = [pscustomobject]@{ Outcome = 'GENERATED'; HttpStatus = 200; ErrorCode = $null; Path = @('OLLAMA', 'E8', 'E1', 'E4', 'E5', 'E6') }
++}
++
++function Get-Prop {
++    param($Object, [string]$Name)
++    if ($null -eq $Object) { return $null }
++    $prop = $Object.PSObject.Properties[$Name]
++    if ($null -eq $prop) { return $null }
++    Write-Output -NoEnumerate $prop.Value
++}
++
++function Has-Prop {
++    param($Object, [string]$Name)
++    return ($null -ne $Object -and $null -ne $Object.PSObject.Properties[$Name])
++}
++
++function Test-Integer {
++    param($Value)
++    if ($null -eq $Value) { return $false }
++    if ($Value -is [int] -or $Value -is [long] -or $Value -is [int16] -or $Value -is [byte]) { return $true }
++    if ($Value -is [double] -or $Value -is [decimal]) { return ([double]$Value -eq [math]::Truncate([double]$Value)) }
++    return $false
++}
++
++function Test-Number {
++    param($Value)
++    return ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [decimal])
++}
++
++function Test-Boolean {
++    param($Value)
++    return ($Value -is [bool])
++}
++
++function Test-UuidV4 {
++    param([string]$Value)
++    if ($null -eq $Value) { return $false }
++    return ($Value -match '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
++}
++
++function Test-Utf8NoBom {
++    param([byte[]]$Bytes)
++    if ($null -eq $Bytes) {
++        return [pscustomobject]@{ Ok = $false; Reason = 'no bytes' }
++    }
++    if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF) {
++        return [pscustomobject]@{ Ok = $false; Reason = 'UTF-8 BOM present' }
++    }
++    try {
++        $strict = [System.Text.UTF8Encoding]::new($false, $true)
++        $null = $strict.GetString($Bytes)
++        return [pscustomobject]@{ Ok = $true; Reason = '' }
++    }
++    catch {
++        return [pscustomobject]@{ Ok = $false; Reason = 'invalid UTF-8' }
++    }
++}
++
++function Add-Error {
++    param($Errors, [string]$Message)
++    [void]$Errors.Add($Message)
++}
++
++function Get-CallCount {
++    param($Calls, [string]$Stage)
++    $value = Get-Prop $Calls $Stage
++    if (Test-Integer $value) { return [int]$value }
++    return -1
++}
++
++function Copy-Fixture {
++    param($Fixture)
++    return ($Fixture | ConvertTo-Json -Depth 20 -Compress | ConvertFrom-Json)
++}
++
++function Test-SequenceEqual {
++    param($Left, $Right)
++    $leftValues = @($Left)
++    $rightValues = @($Right)
++    if ($leftValues.Count -ne $rightValues.Count) { return $false }
++    for ($i = 0; $i -lt $leftValues.Count; $i++) {
++        if ([string]$leftValues[$i] -cne [string]$rightValues[$i]) { return $false }
++    }
++    return $true
++}
++
++function Add-ValuesByName {
++    param($Object, [string]$Name, $Results)
++    if ($null -eq $Object) { return }
++    if ($Object -is [System.Collections.IEnumerable] -and -not ($Object -is [string])) {
++        foreach ($item in $Object) { Add-ValuesByName $item $Name $Results }
++        return
++    }
++    if ($Object -is [pscustomobject]) {
++        foreach ($property in $Object.PSObject.Properties) {
++            if ($property.Name -eq $Name) {
++                [void]$Results.Add($property.Value)
++            }
++            else {
++                Add-ValuesByName $property.Value $Name $Results
++            }
++        }
++    }
++}
++
++function Get-ValuesByName {
++    param($Object, [string]$Name)
++    $results = New-Object System.Collections.Generic.List[object]
++    Add-ValuesByName $Object $Name $results
++    return @($results.ToArray())
++}
++
++function Get-StageIndices {
++    param($Stubs, [string]$Stage)
++    $indices = New-Object System.Collections.Generic.List[int]
++    $items = @($Stubs)
++    for ($i = 0; $i -lt $items.Count; $i++) {
++        if ((Get-Prop $items[$i] 'stage') -eq $Stage) { [void]$indices.Add($i) }
++    }
++    return @($indices.ToArray())
++}
++
++function Get-AbsentMandatoryKeys {
++    param($Data)
++    $keys = @('prenom', 'nom', 'dateNaissance', 'lieuNaissance', 'nomIncorrect', 'nomCorrect')
++    $absent = New-Object System.Collections.Generic.List[string]
++    foreach ($key in $keys) {
++        if (-not (Has-Prop $Data $key)) { [void]$absent.Add($key) }
++    }
++    return @($absent.ToArray())
++}
++
++# Round >= 2 is an input event that carries a requestId. Its extraction is the
++# delta form: a successful OLLAMA stub placed after the first E2 (E2, then
++# extraction). The rule is structural and does not name a fixture.
++function Test-IsDeltaOllamaStub {
++    param($Stubs, $Events, [int]$StubIndex)
++    $hasLaterRound = $false
++    foreach ($event in @($Events)) {
++        $eventBody = Get-Prop $event 'body'
++        $requestId = Get-Prop $eventBody 'requestId'
++        if ($null -ne $requestId -and ([string]$requestId).Length -gt 0) { $hasLaterRound = $true }
++    }
++    if (-not $hasLaterRound) { return $false }
++    $e2Indices = @(Get-StageIndices $Stubs 'E2')
++    if ($e2Indices.Count -eq 0) { return $false }
++    return ($StubIndex -gt [int]$e2Indices[0])
++}
++
++function Add-BirthPhraseErrors {
++    param($Errors, $Events, $Stubs)
++    $success = New-Object System.Collections.Generic.List[object]
++    foreach ($stub in @($Stubs)) {
++        if ((Get-Prop $stub 'stage') -eq 'OLLAMA' -and (Get-Prop $stub 'mode') -eq 'success') {
++            [void]$success.Add($stub)
++        }
++    }
++    $eventItems = @($Events)
++    $pairCount = $eventItems.Count
++    if ($success.Count -lt $pairCount) { $pairCount = $success.Count }
++    if ($pairCount -le 0) { return }
++    $datePattern = [regex]::new('(?<![A-Za-z])[Nn](?:\u00E9e|\u00E9)\s+le\s+(?<day>\d{2})[/-](?<month>\d{2})[/-](?<year>\d{4})')
++    $placePattern = [regex]::new('(?<![A-Za-z])[Nn](?:\u00E9e|\u00E9)\s+le\s+\d{2}[/-]\d{2}[/-]\d{4}\s+\u00E0\s+(?<place>\p{Lu}[\p{L}\u0027\u2019\-]*)')
++    for ($k = 0; $k -lt $pairCount; $k++) {
++        $event = $eventItems[$eventItems.Count - $pairCount + $k]
++        $ollama = $success[$success.Count - $pairCount + $k]
++        $message = [string](Get-Prop (Get-Prop $event 'body') 'message')
++        $data = Get-Prop (Get-Prop $ollama 'body') 'data'
++        foreach ($match in $datePattern.Matches($message)) {
++            $iso = '{0:0000}-{1:00}-{2:00}' -f [int]$match.Groups['year'].Value, [int]$match.Groups['month'].Value, [int]$match.Groups['day'].Value
++            if ([string](Get-Prop $data 'dateNaissance') -cne $iso) {
++                Add-Error $Errors 'message birth date is absent from the paired extraction'
++            }
++        }
++        foreach ($match in $placePattern.Matches($message)) {
++            if ([string](Get-Prop $data 'lieuNaissance') -cne [string]$match.Groups['place'].Value) {
++                Add-Error $Errors 'message birth place is absent from the paired extraction'
++            }
++        }
++    }
++}
++
++function Get-AnalyzedPayload {
++    param($Fixture)
++    return [pscustomobject]@{
++        input = Get-Prop $Fixture 'input'
++        stubs = Get-Prop $Fixture 'stubs'
++    }
++}
++
++function ConvertTo-AnalyzedText {
++    param($Fixture)
++    return ((Get-AnalyzedPayload $Fixture) | ConvertTo-Json -Depth 30 -Compress)
++}
++
++function Test-Uniqueness {
++    param($Fixtures)
++    $errors = New-Object System.Collections.Generic.List[string]
++    $ids = @{}
++    $numbers = @{}
++    foreach ($fixture in @($Fixtures)) {
++        if ($null -eq $fixture) { continue }
++        $id = [string](Get-Prop $fixture 'fixtureId')
++        $number = Get-Prop $fixture 'caseNumber'
++        if ($id -ne '' -and $ids.ContainsKey($id)) {
++            Add-Error $errors "duplicate fixtureId: $id"
++        }
++        elseif ($id -ne '') {
++            $ids[$id] = $true
++        }
++        if (Test-Integer $number) {
++            $key = [string][int]$number
++            if ($numbers.ContainsKey($key)) {
++                Add-Error $errors "duplicate caseNumber: $key"
++            }
++            else {
++                $numbers[$key] = $true
++            }
++        }
++    }
++    return @($errors.ToArray())
++}
++
++function Test-Fixture {
++    param($Fixture, [string]$FileName)
++
++    $errors = New-Object System.Collections.Generic.List[string]
++    if ($null -eq $Fixture) {
++        Add-Error $errors 'fixture is null'
++        return @($errors.ToArray())
++    }
++
++    $topLevel = @(
++        'schemaVersion', 'fixtureId', 'gate', 'caseNumber', 'caseKey', 'title',
++        'description', 'synthetic', 'input', 'stubs', 'expected', 'securityProbe'
++    )
++    foreach ($key in $topLevel) {
++        if (-not (Has-Prop $Fixture $key)) { Add-Error $errors "missing top-level key: $key" }
++    }
++
++    $schemaVersion = Get-Prop $Fixture 'schemaVersion'
++    if ($schemaVersion -ne '1.0') { Add-Error $errors 'schemaVersion must be 1.0' }
++
++    $fixtureId = [string](Get-Prop $Fixture 'fixtureId')
++    $spec = $null
++    if (-not $script:CaseSpec.ContainsKey($fixtureId)) {
++        Add-Error $errors "unknown fixtureId: $fixtureId"
++    }
++    else {
++        $spec = $script:CaseSpec[$fixtureId]
++    }
++
++    $gate = Get-Prop $Fixture 'gate'
++    $caseNumber = Get-Prop $Fixture 'caseNumber'
++    $caseKey = Get-Prop $Fixture 'caseKey'
++    $title = Get-Prop $Fixture 'title'
++    $description = Get-Prop $Fixture 'description'
++    $synthetic = Get-Prop $Fixture 'synthetic'
++
++    if ($null -ne $spec) {
++        if ($gate -ne $spec.Gate) { Add-Error $errors "gate must be $($spec.Gate)" }
++        if (-not (Test-Integer $caseNumber) -or [int]$caseNumber -ne $spec.CaseNumber) { Add-Error $errors "caseNumber must be $($spec.CaseNumber)" }
++        if ($caseKey -ne $spec.CaseKey) { Add-Error $errors "caseKey must be $($spec.CaseKey)" }
++        if ($FileName -ne $spec.File) { Add-Error $errors "file name must be $($spec.File)" }
++    }
++    if (-not ($title -is [string]) -or $title.Trim().Length -eq 0) { Add-Error $errors 'title must be a non-empty string' }
++    if (-not ($description -is [string]) -or $description.Trim().Length -eq 0) { Add-Error $errors 'description must be a non-empty string' }
++    if ($synthetic -ne $true) { Add-Error $errors 'synthetic must be true' }
++
++    $input = Get-Prop $Fixture 'input'
++    if ($null -eq $input -or -not ($input -is [pscustomobject])) {
++        Add-Error $errors 'input must be an object'
++    }
++    else {
++        if ((Get-Prop $input 'method') -ne 'POST') { Add-Error $errors 'input.method must be POST' }
++        if ((Get-Prop $input 'path') -ne '/webhook/document-generation') { Add-Error $errors 'input.path is not the approved webhook path' }
++        if (-not (Test-UuidV4 ([string](Get-Prop $input 'correlationId')))) { Add-Error $errors 'input.correlationId must be a UUID v4' }
++    }
++
++    $eventsValue = Get-Prop $input 'events'
++    $events = @()
++    if ($null -ne $eventsValue) { $events = @($eventsValue) }
++    if ($events.Count -eq 0) { Add-Error $errors 'input.events must contain at least one event' }
++    for ($i = 0; $i -lt $events.Count; $i++) {
++        $event = $events[$i]
++        if ($null -eq $event -or -not ($event -is [pscustomobject])) {
++            Add-Error $errors "input.events[$i] must be an object"
++            continue
++        }
++        $sequence = Get-Prop $event 'sequence'
++        if (-not (Test-Integer $sequence) -or [int]$sequence -ne ($i + 1)) { Add-Error $errors "input.events[$i].sequence must be $($i + 1)" }
++        $eventKeys = @($event.PSObject.Properties.Name)
++        foreach ($key in $eventKeys) {
++            if ($key -notin @('sequence', 'body')) { Add-Error $errors "input.events[$i] has unknown key: $key" }
++        }
++        $body = Get-Prop $event 'body'
++        if ($null -eq $body -or -not ($body -is [pscustomobject])) {
++            Add-Error $errors "input.events[$i].body must be an object"
++            continue
++        }
++        foreach ($key in @($body.PSObject.Properties.Name)) {
++            if ($key -notin @('message', 'requestId')) { Add-Error $errors "input.events[$i].body has unknown key: $key" }
++        }
++        $message = Get-Prop $body 'message'
++        if (-not ($message -is [string]) -or $message.Trim().Length -lt 1 -or $message.Length -gt 4000) {
++            Add-Error $errors "input.events[$i].body.message must be 1..4000 characters"
++        }
++        $requestId = Get-Prop $body 'requestId'
++        if ($null -ne $requestId -and -not ($requestId -is [string])) {
++            Add-Error $errors "input.events[$i].body.requestId must be null or a string"
++        }
++        if ($fixtureId -ne 'I1C-04' -and $null -ne $requestId -and -not (Test-UuidV4 $requestId)) {
++            Add-Error $errors "input.events[$i].body.requestId must be a UUID v4"
++        }
++    }
++
++    $stubsValue = Get-Prop $Fixture 'stubs'
++    $stubs = @()
++    if ($null -ne $stubsValue) { $stubs = @($stubsValue) }
++    $stubCounts = @{}
++    foreach ($stage in $script:Stages) { $stubCounts[$stage] = 0 }
++
++    foreach ($stub in $stubs) {
++        if ($null -eq $stub -or -not ($stub -is [pscustomobject])) {
++            Add-Error $errors 'each stub must be an object'
++            continue
++        }
++        $stage = Get-Prop $stub 'stage'
++        $mode = Get-Prop $stub 'mode'
++        $httpStatus = Get-Prop $stub 'httpStatus'
++        $delayMs = Get-Prop $stub 'delayMs'
++        $body = Get-Prop $stub 'body'
++
++        if ($stage -notin $script:Stages) { Add-Error $errors "stub has unknown stage: $stage" }
++        else { $stubCounts[$stage] += 1 }
++
++        if ($mode -notin @('success', 'error', 'connection_refused', 'timeout')) {
++            Add-Error $errors "stub stage $stage has unknown mode: $mode"
++            continue
++        }
++        if (-not (Test-Integer $delayMs) -or [int]$delayMs -lt 0) {
++            Add-Error $errors "stub stage $stage has invalid delayMs"
++        }
++
++        switch ($mode) {
++            'success' {
++                if (-not (Test-Integer $httpStatus) -or [int]$httpStatus -lt 200 -or [int]$httpStatus -gt 299) {
++                    Add-Error $errors "success stub $stage must use a 2xx httpStatus"
++                }
++                if ($null -eq $body -or -not ($body -is [pscustomobject])) {
++                    Add-Error $errors "success stub $stage must carry a body object"
++                }
++            }
++            'error' {
++                if (-not (Test-Integer $httpStatus) -or [int]$httpStatus -lt 400 -or [int]$httpStatus -gt 599) {
++                    Add-Error $errors "error stub $stage must use a 4xx/5xx httpStatus"
++                }
++                if ($null -eq $body -or -not ($body -is [pscustomobject])) {
++                    Add-Error $errors "error stub $stage must carry a body object"
++                }
++            }
++            'timeout' {
++                if ($null -ne $httpStatus) { Add-Error $errors "timeout stub $stage must not set httpStatus" }
++                if (-not (Test-Integer $delayMs) -or [int]$delayMs -le 0) { Add-Error $errors "timeout stub $stage must set delayMs > 0" }
++                if ($null -ne $body) { Add-Error $errors "timeout stub $stage must not carry a body" }
++            }
++            'connection_refused' {
++                if ($null -ne $httpStatus) { Add-Error $errors "connection_refused stub $stage must not set httpStatus" }
++                if ($null -ne $body) { Add-Error $errors "connection_refused stub $stage must not carry a body" }
++            }
++        }
++
++        if ($mode -eq 'error' -and $stage -in @('E1', 'E2', 'E3', 'E4', 'E5', 'E6') -and (Test-Integer $httpStatus) -and ([int]$httpStatus -eq 400 -or [int]$httpStatus -eq 422)) {
++            $bodyCode = $null
++            if ($null -ne $body -and ($body -is [pscustomobject])) { $bodyCode = Get-Prop $body 'code' }
++            if (-not ($bodyCode -is [string]) -or $bodyCode.Length -eq 0) {
++                Add-Error $errors 'backend 422/400 body.code is absent'
++            }
++            elseif ([int]$httpStatus -eq 422 -and [string]$bodyCode -cne 'MISSING_INFORMATION') {
++                Add-Error $errors 'backend 422 body.code must be MISSING_INFORMATION'
++            }
++            elseif ([int]$httpStatus -eq 400 -and [string]$bodyCode -cne 'VALIDATION_ERROR') {
++                Add-Error $errors 'backend 400 body.code must be VALIDATION_ERROR'
++            }
++        }
++
++        if ($stage -eq 'OLLAMA' -and $mode -eq 'success') {
++            $documentType = Get-Prop $body 'documentType'
++            $confidence = Get-Prop $body 'confidence'
++            $data = Get-Prop $body 'data'
++            $missingFields = Get-Prop $body 'missingFields'
++            if ($documentType -ne 'ATTESTATION_CONCORDANCE') { Add-Error $errors 'OLLAMA success body must target ATTESTATION_CONCORDANCE' }
++            if (-not (Test-Number $confidence) -or [double]$confidence -lt 0 -or [double]$confidence -gt 1) { Add-Error $errors 'OLLAMA confidence must be within [0,1]' }
++            if ($null -eq $data -or -not ($data -is [pscustomobject])) { Add-Error $errors 'OLLAMA body.data must be an object' }
++            if ($null -eq $missingFields -or -not ($missingFields -is [array])) { Add-Error $errors 'OLLAMA body.missingFields must be an array' }
++        }
++    }
++
++    $expected = Get-Prop $Fixture 'expected'
++    if ($null -eq $expected -or -not ($expected -is [pscustomobject])) {
++        Add-Error $errors 'expected must be an object'
++        return @($errors.ToArray())
++    }
++
++    $finalHttpStatus = Get-Prop $expected 'finalHttpStatus'
++    $finalOutcome = Get-Prop $expected 'finalOutcome'
++    $errorCode = Get-Prop $expected 'errorCode'
++    $expectedRequestId = Get-Prop $expected 'requestId'
++    $expectedDocumentId = Get-Prop $expected 'documentId'
++    $missingFieldsValue = Get-Prop $expected 'missingFields'
++    $calls = Get-Prop $expected 'calls'
++    $idempotency = Get-Prop $expected 'idempotency'
++    $securityScan = Get-Prop $expected 'securityScan'
++
++    if (-not (Test-Integer $finalHttpStatus)) { Add-Error $errors 'expected.finalHttpStatus must be an integer' }
++    if ($finalOutcome -notin $script:Outcomes) { Add-Error $errors "expected.finalOutcome is not approved: $finalOutcome" }
++    if ($null -ne $errorCode -and $errorCode -notin $script:ErrorCodes) { Add-Error $errors "expected.errorCode is not approved: $errorCode" }
++    if ($null -ne $expectedRequestId -and -not (Test-UuidV4 ([string]$expectedRequestId))) { Add-Error $errors 'expected.requestId must be null or UUID v4' }
++    if ($null -ne $expectedDocumentId -and -not (Test-UuidV4 ([string]$expectedDocumentId))) { Add-Error $errors 'expected.documentId must be null or UUID v4' }
++
++    $missingFields = @()
++    if ($null -ne $missingFieldsValue) { $missingFields = @($missingFieldsValue) }
++    if ($null -ne $missingFieldsValue -and -not ($missingFieldsValue -is [array])) {
++        Add-Error $errors 'expected.missingFields must be an array'
++    }
++    foreach ($field in $missingFields) {
++        if (-not ($field -is [string]) -or $field.Trim().Length -eq 0) { Add-Error $errors 'expected.missingFields entries must be non-empty strings' }
++    }
++    if (@($missingFields | Select-Object -Unique).Count -ne $missingFields.Count) {
++        Add-Error $errors 'expected.missingFields must not contain duplicates'
++    }
++
++    # FIX-01: assert the approved business outcome, HTTP status, error code and
++    # the exact ordered call path of stub stages.
++    $contract = $null
++    if ($script:Contracts.ContainsKey($fixtureId)) { $contract = $script:Contracts[$fixtureId] }
++    if ($null -ne $contract) {
++        if ($finalOutcome -cne $contract.Outcome) {
++            Add-Error $errors "expected.finalOutcome must be $($contract.Outcome) for $fixtureId (got $finalOutcome)"
++        }
++        if (-not (Test-Integer $finalHttpStatus) -or [int]$finalHttpStatus -ne [int]$contract.HttpStatus) {
++            Add-Error $errors "expected.finalHttpStatus must be $($contract.HttpStatus) for $fixtureId (got $finalHttpStatus)"
++        }
++        $errorCodeMatches = $false
++        if ($null -eq $contract.ErrorCode) { $errorCodeMatches = ($null -eq $errorCode) }
++        elseif ($null -ne $errorCode) { $errorCodeMatches = ([string]$errorCode -ceq [string]$contract.ErrorCode) }
++        if (-not $errorCodeMatches) {
++            $expectedErrorText = 'null'
++            if ($null -ne $contract.ErrorCode) { $expectedErrorText = [string]$contract.ErrorCode }
++            Add-Error $errors "expected.errorCode must be $expectedErrorText for $fixtureId (got $errorCode)"
++        }
++        $actualPath = @($stubs | ForEach-Object { [string](Get-Prop $_ 'stage') })
++        $expectedPathText = @($contract.Path) -join ','
++        $actualPathText = @($actualPath) -join ','
++        if ($actualPathText -cne $expectedPathText) {
++            Add-Error $errors "$fixtureId call path mismatch: expected $expectedPathText, got $actualPathText"
++        }
++    }
++
++    # FIX-02: identifiers and missingFields must be consistent across input
++    # events, simulated stub responses and the expected contract.
++    if ($fixtureId -ne 'I1C-04') {
++        for ($i = 0; $i -lt $events.Count; $i++) {
++            $eventRequestId = Get-Prop $events[$i].body 'requestId'
++            if ($null -ne $eventRequestId -and ([string]$eventRequestId -cne [string]$expectedRequestId)) {
++                Add-Error $errors "requestId does not match expected.requestId for input.events[$i] (got $eventRequestId)"
++            }
++        }
++    }
++    for ($i = 0; $i -lt $stubs.Count; $i++) {
++        $stubBody = Get-Prop $stubs[$i] 'body'
++        if ($null -eq $stubBody) { continue }
++        $stubRequestId = Get-Prop $stubBody 'requestId'
++        if ($null -ne $stubRequestId -and ([string]$stubRequestId -cne [string]$expectedRequestId)) {
++            Add-Error $errors "requestId does not match expected.requestId for stub index $i (got $stubRequestId)"
++        }
++    }
++    foreach ($foundDocumentId in @(Get-ValuesByName $stubs 'documentId')) {
++        if ([string]$foundDocumentId -cne [string]$expectedDocumentId) {
++            Add-Error $errors "documentId does not match expected.documentId (got $foundDocumentId)"
++        }
++    }
++    $ollamaSuccessSeen = 0
++    for ($i = 0; $i -lt $stubs.Count; $i++) {
++        $stub = $stubs[$i]
++        $stage = Get-Prop $stub 'stage'
++        $mode = Get-Prop $stub 'mode'
++        $stubBody = Get-Prop $stub 'body'
++        if ($null -eq $stubBody) { continue }
++        $relevant = (($stage -eq 'OLLAMA' -and $mode -eq 'success') -or ($stage -eq 'E1') -or ($stage -eq 'E3') -or ($stage -eq 'E2' -and $fixtureId -ne 'I1C-02'))
++        if (-not $relevant) { continue }
++        if (-not (Has-Prop $stubBody 'missingFields')) { continue }
++        $stubMissingFieldsValue = Get-Prop $stubBody 'missingFields'
++        $stubMissingFields = @()
++        if ($null -ne $stubMissingFieldsValue) { $stubMissingFields = @($stubMissingFieldsValue) }
++        # Delta extraction (round >= 2): missingFields follows the payload-scoped
++        # allOf rule. It is not compared to expected.missingFields.
++        if ($stage -eq 'OLLAMA' -and $mode -eq 'success' -and (Test-IsDeltaOllamaStub $stubs $events $i)) {
++            $absentKeys = @(Get-AbsentMandatoryKeys (Get-Prop $stubBody 'data'))
++            if (-not (Test-SequenceEqual $stubMissingFields $absentKeys)) {
++                Add-Error $errors 'delta extraction missingFields must redeclare every mandatory key absent from data'
++            }
++            continue
++        }
++        # I1C-05 keeps the round-1 state on the first extraction, E1 and E2.
++        # The final expected list applies only to the delta extraction and E3.
++        $isI1C05PriorRound = $false
++        if ($fixtureId -eq 'I1C-05') {
++            if ($stage -eq 'OLLAMA' -and $mode -eq 'success') {
++                if ($ollamaSuccessSeen -eq 0) { $isI1C05PriorRound = $true }
++                $ollamaSuccessSeen++
++            }
++            elseif ($stage -eq 'E1' -or $stage -eq 'E2') {
++                $isI1C05PriorRound = $true
++            }
++        }
++        if ($isI1C05PriorRound) {
++            $priorFields = @('dateNaissance', 'lieuNaissance')
++            if (-not (Test-SequenceEqual $stubMissingFields $priorFields)) {
++                Add-Error $errors "I1C-05 prior-round missingFields must be [dateNaissance, lieuNaissance] for stub stage $stage"
++            }
++            continue
++        }
++        if (-not (Test-SequenceEqual $stubMissingFields $missingFields)) {
++            Add-Error $errors "missingFields do not match expected.missingFields for stub stage $stage"
++        }
++    }
++
++    Add-BirthPhraseErrors $errors $events $stubs
++
++    if ($null -eq $calls -or -not ($calls -is [pscustomobject])) {
++        Add-Error $errors 'expected.calls must be an object'
++    }
++    else {
++        $totalCalls = 0
++        foreach ($stage in $script:Stages) {
++            $count = Get-Prop $calls $stage
++            if (-not (Test-Integer $count) -or [int]$count -lt 0) {
++                Add-Error $errors "expected.calls.$stage must be an integer >= 0"
++            }
++            else {
++                $totalCalls += [int]$count
++                if ($stubCounts[$stage] -ne [int]$count) {
++                    Add-Error $errors "stub count for $stage is $($stubCounts[$stage]) but expected.calls.$stage is $count"
++                }
++            }
++        }
++        if ($stubs.Count -ne $totalCalls) {
++            Add-Error $errors "stub count is $($stubs.Count) but expected total calls is $totalCalls"
++        }
++    }
++
++    if ($finalOutcome -eq 'GENERATED') {
++        if (-not (Test-UuidV4 ([string]$expectedRequestId))) { Add-Error $errors 'GENERATED requires a UUID requestId' }
++        if (-not (Test-UuidV4 ([string]$expectedDocumentId))) { Add-Error $errors 'GENERATED requires a UUID documentId' }
++        if ($missingFields.Count -ne 0) { Add-Error $errors 'GENERATED must not declare missingFields' }
++        if ([int]$finalHttpStatus -ne 200) { Add-Error $errors 'GENERATED must map to HTTP 200' }
++        if ($null -ne $errorCode) { Add-Error $errors 'GENERATED must not carry an errorCode' }
++    }
++    elseif ($finalOutcome -eq 'MISSING_INFORMATION') {
++        if (-not (Test-UuidV4 ([string]$expectedRequestId))) { Add-Error $errors 'MISSING_INFORMATION requires a UUID requestId' }
++        if ($missingFields.Count -eq 0) { Add-Error $errors 'MISSING_INFORMATION requires at least one missing field' }
++        if ($null -ne $expectedDocumentId) { Add-Error $errors 'MISSING_INFORMATION must not carry a documentId' }
++        if ([int]$finalHttpStatus -ne 200) { Add-Error $errors 'MISSING_INFORMATION must map to HTTP 200' }
++        if ($null -ne $errorCode) { Add-Error $errors 'MISSING_INFORMATION must not carry an errorCode' }
++    }
++    elseif ($finalOutcome -eq 'INVALID_REQUEST') {
++        if ([int]$finalHttpStatus -ne 400) { Add-Error $errors 'INVALID_REQUEST must map to HTTP 400' }
++        if ($errorCode -ne 'VALIDATION_ERROR') { Add-Error $errors 'INVALID_REQUEST must carry VALIDATION_ERROR' }
++        if ($null -ne $expectedRequestId) { Add-Error $errors 'INVALID_REQUEST must not carry a requestId' }
++        if ($null -ne $expectedDocumentId) { Add-Error $errors 'INVALID_REQUEST must not carry a documentId' }
++    }
++    elseif ($finalOutcome -eq 'REQUEST_NOT_FOUND') {
++        if ([int]$finalHttpStatus -ne 404) { Add-Error $errors 'REQUEST_NOT_FOUND must map to HTTP 404' }
++        if ($errorCode -ne 'REQUEST_NOT_FOUND') { Add-Error $errors 'REQUEST_NOT_FOUND must carry the REQUEST_NOT_FOUND code' }
++        if ($null -ne $expectedDocumentId) { Add-Error $errors 'REQUEST_NOT_FOUND must not carry a documentId' }
++    }
++    elseif ($finalOutcome -eq 'ERROR') {
++        if ([int]$finalHttpStatus -notin @(500, 502, 503)) { Add-Error $errors 'ERROR must map to HTTP 500, 502 or 503' }
++        if ($errorCode -notin @('INTERNAL_ERROR', 'AI_EXTRACTION_ERROR', 'EXTRACTION_SCHEMA_INVALID', 'BACKEND_UNAVAILABLE')) {
++            Add-Error $errors "ERROR has an invalid errorCode: $errorCode"
++        }
++        if ($errorCode -eq 'INTERNAL_ERROR' -and [int]$finalHttpStatus -ne 500) { Add-Error $errors 'INTERNAL_ERROR must map to HTTP 500' }
++        if ($errorCode -in @('AI_EXTRACTION_ERROR', 'EXTRACTION_SCHEMA_INVALID') -and [int]$finalHttpStatus -ne 502) { Add-Error $errors 'AI extraction errors must map to HTTP 502' }
++        if ($errorCode -eq 'BACKEND_UNAVAILABLE' -and [int]$finalHttpStatus -ne 503) { Add-Error $errors 'BACKEND_UNAVAILABLE must map to HTTP 503' }
++        if ($null -ne $expectedDocumentId) { Add-Error $errors 'ERROR must not carry a documentId' }
++    }
++    else {
++        if ([int]$finalHttpStatus -ne 200) { Add-Error $errors "$finalOutcome must map to HTTP 200" }
++        if ($null -ne $errorCode) { Add-Error $errors "$finalOutcome must not carry an errorCode" }
++    }
++
++    if ($null -eq $securityScan -or -not ($securityScan -is [pscustomobject])) {
++        Add-Error $errors 'expected.securityScan must be an object'
++    }
++    else {
++        $piiInLogs = Get-Prop $securityScan 'piiInLogs'
++        $binaryInExecutionData = Get-Prop $securityScan 'binaryInExecutionData'
++        if (-not (Test-Boolean $piiInLogs)) { Add-Error $errors 'expected.securityScan.piiInLogs must be boolean' }
++        if (-not (Test-Boolean $binaryInExecutionData)) { Add-Error $errors 'expected.securityScan.binaryInExecutionData must be boolean' }
++        if ($piiInLogs -ne $false) { Add-Error $errors 'expected.securityScan.piiInLogs must be false' }
++        if ($binaryInExecutionData -ne $false) { Add-Error $errors 'expected.securityScan.binaryInExecutionData must be false' }
++    }
++
++    $securityProbe = Get-Prop $Fixture 'securityProbe'
++    if ($fixtureId -in @('I1C-01', 'I1C-02', 'I1C-03', 'I1C-04', 'I1C-05', 'I1D-05', 'I1D-06', 'I1D-07', 'I1D-08')) {
++        if ($null -ne $securityProbe) { Add-Error $errors 'securityProbe must be null for this case' }
++        if ($null -ne $idempotency -and $fixtureId -ne 'I1D-05') { Add-Error $errors 'idempotency must be null for this case' }
++    }
++
++    switch ($fixtureId) {
++        'I1C-01' {
++            if ($events.Count -ne 1) { Add-Error $errors 'I1C-01 must have exactly one event' }
++            if ($events.Count -ge 1 -and $null -ne (Get-Prop $events[0].body 'requestId')) { Add-Error $errors 'I1C-01 first event must not carry a requestId' }
++            if ((Get-CallCount $calls 'E1') -ne 1) { Add-Error $errors 'I1C-01 must call E1 once' }
++            if ((Get-CallCount $calls 'E2') -ne 0 -or (Get-CallCount $calls 'E3') -ne 0) { Add-Error $errors 'I1C-01 must not call E2 or E3' }
++            break
++        }
++        'I1C-02' {
++            if ($events.Count -ne 2) { Add-Error $errors 'I1C-02 must have exactly two events' }
++            if ($events.Count -ge 2) {
++                if ($null -ne (Get-Prop $events[0].body 'requestId')) { Add-Error $errors 'I1C-02 round 1 must not carry a requestId' }
++                if (-not (Test-UuidV4 ([string](Get-Prop $events[1].body 'requestId')))) { Add-Error $errors 'I1C-02 round 2 must carry a UUID requestId' }
++            }
++            if ((Get-CallCount $calls 'E1') -ne 0) { Add-Error $errors 'I1C-02 must not call E1' }
++            if ((Get-CallCount $calls 'E2') -ne 1 -or (Get-CallCount $calls 'E3') -ne 1) { Add-Error $errors 'I1C-02 must call E2 and E3 exactly once' }
++            $e2Indices = @(Get-StageIndices $stubs 'E2')
++            $ollamaIndices = @(Get-StageIndices $stubs 'OLLAMA')
++            $e3Indices = @(Get-StageIndices $stubs 'E3')
++            $e2Before = ($e2Indices.Count -gt 0 -and $ollamaIndices.Count -gt 0 -and $e3Indices.Count -gt 0 -and $e2Indices[0] -lt $ollamaIndices[0] -and $e2Indices[0] -lt $e3Indices[0])
++            if (-not $e2Before) { Add-Error $errors 'I1C-02 E2 must occur before extraction (OLLAMA) and E3' }
++            break
++        }
++        'I1C-03' {
++            if ($events.Count -ne 1) { Add-Error $errors 'I1C-03 must have exactly one event' }
++            if ($events.Count -ge 1 -and $null -ne (Get-Prop $events[0].body 'requestId')) { Add-Error $errors 'I1C-03 first event must not carry a requestId' }
++            if (($missingFields -join ',') -ne 'dateNaissance,lieuNaissance') { Add-Error $errors 'I1C-03 missingFields must be exactly [dateNaissance, lieuNaissance]' }
++            if ((Get-CallCount $calls 'E1') -ne 1) { Add-Error $errors 'I1C-03 must call E1 once' }
++            foreach ($stage in @('E4', 'E5', 'E6')) {
++                if ((Get-CallCount $calls $stage) -ne 0) { Add-Error $errors "I1C-03 must not call $stage" }
++            }
++            break
++        }
++        'I1C-04' {
++            if ($events.Count -ne 1) { Add-Error $errors 'I1C-04 must have exactly one event' }
++            if ($events.Count -ge 1) {
++                $rid = Get-Prop $events[0].body 'requestId'
++                if (-not ($rid -is [string]) -or (Test-UuidV4 $rid)) { Add-Error $errors 'I1C-04 must carry a deliberately invalid requestId' }
++            }
++            if ($stubs.Count -ne 0) { Add-Error $errors 'I1C-04 must not define stubs' }
++            foreach ($stage in $script:Stages) {
++                if ((Get-CallCount $calls $stage) -ne 0) { Add-Error $errors "I1C-04 must not call $stage" }
++            }
++            break
++        }
++        'I1C-05' {
++            if ($events.Count -ne 2) { Add-Error $errors 'I1C-05 must have exactly two events' }
++            if ($events.Count -ge 2) {
++                if ($null -ne (Get-Prop $events[0].body 'requestId')) { Add-Error $errors 'I1C-05 round 1 must not carry a requestId' }
++                if (-not (Test-UuidV4 ([string](Get-Prop $events[1].body 'requestId')))) { Add-Error $errors 'I1C-05 round 2 must carry a UUID requestId' }
++            }
++            if (($missingFields -join ',') -ne 'lieuNaissance') { Add-Error $errors 'I1C-05 missingFields must be exactly [lieuNaissance]' }
++            if ((Get-CallCount $calls 'E1') -ne 1 -or (Get-CallCount $calls 'E2') -ne 1 -or (Get-CallCount $calls 'E3') -ne 1) {
++                Add-Error $errors 'I1C-05 must call E1, E2 and E3 exactly once'
++            }
++            if ((Get-CallCount $calls 'OLLAMA') -ne 2 -or (Get-CallCount $calls 'E8') -ne 2) {
++                Add-Error $errors 'I1C-05 must call OLLAMA and E8 twice'
++            }
++            foreach ($stage in @('E4', 'E5', 'E6')) {
++                if ((Get-CallCount $calls $stage) -ne 0) { Add-Error $errors "I1C-05 must not call $stage" }
++            }
++            $e1Stubs = @($stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E1' })
++            if ($e1Stubs.Count -ge 1) {
++                $e1Status = Get-Prop $e1Stubs[0] 'httpStatus'
++                if ((Get-Prop $e1Stubs[0] 'mode') -ne 'error' -or -not (Test-Integer $e1Status) -or [int]$e1Status -ne 422) {
++                    Add-Error $errors 'I1C-05 E1 must be an error 422'
++                }
++            }
++            $e3Stubs = @($stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E3' })
++            if ($e3Stubs.Count -ge 1) {
++                $e3Status = Get-Prop $e3Stubs[0] 'httpStatus'
++                if ((Get-Prop $e3Stubs[0] 'mode') -ne 'success' -or -not (Test-Integer $e3Status) -or [int]$e3Status -ne 200) {
++                    Add-Error $errors 'I1C-05 E3 must be a success 200'
++                }
++                if ((Get-Prop (Get-Prop $e3Stubs[0] 'body') 'status') -ne 'MISSING_INFORMATION') {
++                    Add-Error $errors 'I1C-05 E3 status must be MISSING_INFORMATION'
++                }
++            }
++            $e2Indices = @(Get-StageIndices $stubs 'E2')
++            $ollamaIndices = @(Get-StageIndices $stubs 'OLLAMA')
++            $e3Indices = @(Get-StageIndices $stubs 'E3')
++            $e2BeforeSecond = ($e2Indices.Count -gt 0 -and $ollamaIndices.Count -ge 2 -and $e3Indices.Count -gt 0 -and $e2Indices[0] -lt $ollamaIndices[1] -and $e2Indices[0] -lt $e3Indices[0])
++            if (-not $e2BeforeSecond) { Add-Error $errors 'I1C-05 E2 must occur before the second extraction (OLLAMA) and E3' }
++            break
++        }
++        'I1D-05' {
++            if ($events.Count -ne 2) { Add-Error $errors 'I1D-05 must have exactly two events' }
++            if ($events.Count -ge 2) {
++                $rid1 = [string](Get-Prop $events[0].body 'requestId')
++                $rid2 = [string](Get-Prop $events[1].body 'requestId')
++                if (-not (Test-UuidV4 $rid1) -or $rid1 -ne $rid2) { Add-Error $errors 'I1D-05 events must share one UUID requestId' }
++            }
++            if ($null -eq $idempotency -or -not ($idempotency -is [pscustomobject])) {
++                Add-Error $errors 'I1D-05 must declare an idempotency object'
++            }
++            else {
++                if ((Get-Prop $idempotency 'key') -ne 'same-requestId') { Add-Error $errors 'I1D-05 idempotency.key must be same-requestId' }
++                if ((Get-Prop $idempotency 'sameDocumentId') -ne $true) { Add-Error $errors 'I1D-05 idempotency.sameDocumentId must be true' }
++            }
++            if ((Get-CallCount $calls 'E1') -ne 0) { Add-Error $errors 'I1D-05 must not call E1' }
++            if ((Get-CallCount $calls 'E2') -ne 2) { Add-Error $errors 'I1D-05 must call E2 twice' }
++            if ((Get-CallCount $calls 'E6') -ne 2) { Add-Error $errors 'I1D-05 must call E6 twice' }
++            $path = @($stubs | ForEach-Object { [string](Get-Prop $_ 'stage') })
++            if ($path.Count -eq 0 -or $path[0] -ne 'E2') { Add-Error $errors 'I1D-05 E2 must be the first call' }
++            $lastGenerationIndex = -1
++            $roundSemanticsOk = $true
++            for ($i = 0; $i -lt $path.Count; $i++) {
++                if ($path[$i] -eq 'E2') { $lastGenerationIndex = $i }
++                elseif ($path[$i] -eq 'E6') {
++                    if ($lastGenerationIndex -lt 0 -or $lastGenerationIndex -ge $i) { $roundSemanticsOk = $false }
++                    else { $lastGenerationIndex = -1 }
++                }
++            }
++            if (-not $roundSemanticsOk) { Add-Error $errors 'I1D-05 E6 must occur after E2 generation' }
++            break
++        }
++        'I1D-06' {
++            if ($finalOutcome -ne 'ERROR' -or $errorCode -ne 'INTERNAL_ERROR' -or [int]$finalHttpStatus -ne 500) { Add-Error $errors 'I1D-06 must expect 500 INTERNAL_ERROR' }
++            if ((Get-CallCount $calls 'E4') -ne 3) { Add-Error $errors 'I1D-06 must call E4 three times' }
++            $e4 = @($stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E4' })
++            if ($e4.Count -ne 3) { Add-Error $errors 'I1D-06 must define three E4 stubs' }
++            foreach ($stub in $e4) {
++                if ((Get-Prop $stub 'mode') -ne 'error' -or [int](Get-Prop $stub 'httpStatus') -ne 500) { Add-Error $errors 'I1D-06 E4 stubs must all be error 500' }
++            }
++            break
++        }
++        'I1D-07' {
++            if ($finalOutcome -ne 'ERROR' -or $errorCode -ne 'AI_EXTRACTION_ERROR' -or [int]$finalHttpStatus -ne 502) { Add-Error $errors 'I1D-07 must expect 502 AI_EXTRACTION_ERROR' }
++            if ((Get-CallCount $calls 'OLLAMA') -ne 3) { Add-Error $errors 'I1D-07 must attempt OLLAMA three times' }
++            foreach ($stage in @('E8', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6')) {
++                if ((Get-CallCount $calls $stage) -ne 0) { Add-Error $errors "I1D-07 must not call $stage" }
++            }
++            foreach ($stub in @($stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'OLLAMA' })) {
++                if ((Get-Prop $stub 'mode') -ne 'connection_refused') { Add-Error $errors 'I1D-07 OLLAMA stubs must use connection_refused mode' }
++            }
++            break
++        }
++        'I1D-08' {
++            if ($finalOutcome -ne 'ERROR' -or $errorCode -ne 'AI_EXTRACTION_ERROR' -or [int]$finalHttpStatus -ne 502) { Add-Error $errors 'I1D-08 must expect 502 AI_EXTRACTION_ERROR' }
++            if ((Get-CallCount $calls 'OLLAMA') -ne 3) { Add-Error $errors 'I1D-08 must attempt OLLAMA three times' }
++            foreach ($stage in @('E8', 'E1', 'E2', 'E3', 'E4', 'E5', 'E6')) {
++                if ((Get-CallCount $calls $stage) -ne 0) { Add-Error $errors "I1D-08 must not call $stage" }
++            }
++            foreach ($stub in @($stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'OLLAMA' })) {
++                if ((Get-Prop $stub 'mode') -ne 'timeout') { Add-Error $errors 'I1D-08 OLLAMA stubs must use timeout mode' }
++                if (-not (Test-Integer (Get-Prop $stub 'delayMs')) -or [int](Get-Prop $stub 'delayMs') -le 0) { Add-Error $errors 'I1D-08 OLLAMA timeout stubs must set delayMs' }
++            }
++            break
++        }
++        'I1D-09' {
++            if ($null -eq $securityProbe -or -not ($securityProbe -is [pscustomobject])) {
++                Add-Error $errors 'I1D-09 must define a securityProbe object'
++            }
++            else {
++                if ((Get-Prop $securityProbe 'kind') -ne 'pii') { Add-Error $errors 'I1D-09 securityProbe.kind must be pii' }
++                $markersValue = Get-Prop $securityProbe 'markers'
++                $markers = @()
++                if ($null -ne $markersValue) { $markers = @($markersValue) }
++                if ($markers.Count -lt 4) { Add-Error $errors 'I1D-09 must declare at least four PII markers' }
++                $analyzedText = ConvertTo-AnalyzedText $Fixture
++                $seenMarkers = @()
++                foreach ($marker in $markers) {
++                    if (-not ($marker -is [string]) -or $marker.Trim().Length -eq 0) {
++                        Add-Error $errors 'I1D-09 markers must be non-empty strings'
++                        continue
++                    }
++                    if ($seenMarkers -cnotcontains $marker) { $seenMarkers += $marker }
++                    else { Add-Error $errors "I1D-09 markers must be unique: $marker" }
++                    if ($analyzedText.IndexOf($marker, [System.StringComparison]::Ordinal) -lt 0) {
++                        Add-Error $errors "I1D-09 marker is absent from the analyzed payload: $marker"
++                    }
++                }
++            }
++            if ((Get-CallCount $calls 'E1') -ne 1 -or (Get-CallCount $calls 'E5') -ne 1) { Add-Error $errors 'I1D-09 must keep the normal generation call path' }
++            break
++        }
++        'I1D-10' {
++            if ($null -eq $securityProbe -or -not ($securityProbe -is [pscustomobject])) {
++                Add-Error $errors 'I1D-10 must define a securityProbe object'
++            }
++            else {
++                if ((Get-Prop $securityProbe 'kind') -ne 'binary') { Add-Error $errors 'I1D-10 securityProbe.kind must be binary' }
++                $base64 = Get-Prop $securityProbe 'base64'
++                $expectedMagic = [string](Get-Prop $securityProbe 'expectedMagicHex')
++                if (-not ($base64 -is [string]) -or $base64.Length -eq 0) {
++                    Add-Error $errors 'I1D-10 securityProbe.base64 must be a non-empty string'
++                }
++                else {
++                    $analyzedText = ConvertTo-AnalyzedText $Fixture
++                    try {
++                        $bytes = [Convert]::FromBase64String($base64)
++                        $hex = ($bytes | ForEach-Object { $_.ToString('X2') }) -join ''
++                        if ($expectedMagic -ne '504B0304') { Add-Error $errors 'I1D-10 expectedMagicHex must be 504B0304' }
++                        if (-not $hex.StartsWith($expectedMagic, [System.StringComparison]::OrdinalIgnoreCase)) {
++                            Add-Error $errors "I1D-10 base64 does not start with $expectedMagic"
++                        }
++                    }
++                    catch {
++                        Add-Error $errors 'I1D-10 base64 is not valid base64'
++                    }
++                    if ($analyzedText.IndexOf($base64, [System.StringComparison]::Ordinal) -lt 0) {
++                        Add-Error $errors 'I1D-10 binary signature is absent from the analyzed payload'
++                    }
++                }
++            }
++            if ((Get-CallCount $calls 'E1') -ne 1 -or (Get-CallCount $calls 'E5') -ne 1) { Add-Error $errors 'I1D-10 must keep the normal generation call path' }
++            break
++        }
++    }
++
++    return @($errors.ToArray())
++}
++
++function Assert-Negative-Diagnostic {
++    param(
++        [string]$Name,
++        [object[]]$Errors,
++        [string]$ExpectedDiagnostic
++    )
++    $actual = @($Errors | ForEach-Object { [string]$_ })
++    $found = $false
++    foreach ($message in $actual) {
++        if ($message.IndexOf($ExpectedDiagnostic, [System.StringComparison]::Ordinal) -ge 0) {
++            $found = $true
++            break
++        }
++    }
++    if ($found) {
++        Write-Output ("SELFTEST {0} PASS" -f $Name)
++        $script:SelfTestPassed++
++    }
++    else {
++        Write-Output ("SELFTEST {0} FAIL" -f $Name)
++        Write-Output ("      expected diagnostic: {0}" -f $ExpectedDiagnostic)
++        if ($actual.Count -eq 0) {
++            Write-Output '      actual errors: <none>'
++        }
++        else {
++            foreach ($message in $actual) { Write-Output ("      actual error: {0}" -f $message) }
++        }
++        $script:SelfTestFailed++
++    }
++}
++
++# ---------------------------------------------------------------------------
++# Main
++# ---------------------------------------------------------------------------
++Write-Output 'DG-I1-FIXTURES-001 static validator'
++Write-Output ("fixtureDir={0}" -f $FixtureDir)
++
++if (-not (Test-Path -LiteralPath $FixtureDir -PathType Container)) {
++    Write-Output 'RESULT: FAIL (fixture directory missing)'
++    exit 2
++}
++
++try {
++    $actualFiles = @(Get-ChildItem -LiteralPath $FixtureDir -File -Filter '*.json' | Sort-Object Name)
++}
++catch {
++    Write-Output 'RESULT: FAIL (fixture directory unreadable)'
++    exit 2
++}
++
++$expectedFiles = @($script:CaseOrder | ForEach-Object { $script:CaseSpec[$_].File })
++$actualNames = @($actualFiles | ForEach-Object { $_.Name })
++
++foreach ($expected in $expectedFiles) {
++    if ($actualNames -notcontains $expected) {
++        Write-Output ("FAIL missing fixture: {0}" -f $expected)
++        $script:Failures++
++    }
++}
++foreach ($actual in $actualNames) {
++    if ($expectedFiles -notcontains $actual) {
++        Write-Output ("FAIL unexpected fixture: {0}" -f $actual)
++        $script:Failures++
++    }
++}
++
++$loaded = @()
++foreach ($name in $expectedFiles) {
++    if ($actualNames -notcontains $name) { continue }
++    $path = Join-Path $FixtureDir $name
++    try {
++        $bytes = [System.IO.File]::ReadAllBytes($path)
++    }
++    catch {
++        Write-Output ("FAIL {0} unreadable" -f $name)
++        $script:Failures++
++        continue
++    }
++
++    $encoding = Test-Utf8NoBom $bytes
++    if (-not $encoding.Ok) {
++        Write-Output ("FAIL {0} encoding: {1}" -f $name, $encoding.Reason)
++        $script:Failures++
++        continue
++    }
++
++    try {
++        $text = [System.Text.Encoding]::UTF8.GetString($bytes)
++        $fixture = $text | ConvertFrom-Json
++    }
++    catch {
++        Write-Output ("FAIL {0} invalid JSON: {1}" -f $name, $_.Exception.Message)
++        $script:Failures++
++        continue
++    }
++
++    $errors = @(Test-Fixture $fixture $name)
++    if ($errors.Count -eq 0) {
++        Write-Output ("PASS {0}" -f $name)
++        $script:Passed++
++        $loaded += $fixture
++    }
++    else {
++        Write-Output ("FAIL {0}" -f $name)
++        foreach ($message in $errors) { Write-Output ("      - {0}" -f $message) }
++        $script:Failures++
++    }
++}
++
++if ($loaded.Count -eq $expectedFiles.Count) {
++    $uniqueErrors = @(Test-Uniqueness $loaded)
++    if ($uniqueErrors.Count -eq 0) {
++        Write-Output 'PASS fixture identifiers unique'
++        $script:Passed++
++    }
++    else {
++        Write-Output 'FAIL fixture identifiers unique'
++        foreach ($message in $uniqueErrors) { Write-Output ("      - {0}" -f $message) }
++        $script:Failures++
++    }
++}
++
++if ($SelfTest) {
++    Write-Output '--- SELF-TEST (negative mutations) ---'
++    $byId = @{}
++    foreach ($fixture in $loaded) { $byId[[string]$fixture.fixtureId] = $fixture }
++
++    # 1. missing-finalOutcome
++    if ($byId.ContainsKey('I1C-01')) {
++        $mutated = Copy-Fixture $byId['I1C-01']
++        $mutated.expected.PSObject.Properties.Remove('finalOutcome')
++        Assert-Negative-Diagnostic 'missing-finalOutcome' @(Test-Fixture $mutated 'i1c_01_initial_valid.json') 'expected.finalOutcome is not approved'
++    }
++    else { Assert-Negative-Diagnostic 'missing-finalOutcome' @() 'expected.finalOutcome is not approved' }
++
++    # 2. invalid-finalOutcome
++    if ($byId.ContainsKey('I1C-01')) {
++        $mutated = Copy-Fixture $byId['I1C-01']
++        $mutated.expected.finalOutcome = 'NOT_AN_OUTCOME'
++        Assert-Negative-Diagnostic 'invalid-finalOutcome' @(Test-Fixture $mutated 'i1c_01_initial_valid.json') 'expected.finalOutcome is not approved'
++    }
++    else { Assert-Negative-Diagnostic 'invalid-finalOutcome' @() 'expected.finalOutcome is not approved' }
++
++    # 3. generated-to-rejected
++    if ($byId.ContainsKey('I1C-01')) {
++        $mutated = Copy-Fixture $byId['I1C-01']
++        $mutated.expected.finalOutcome = 'REJECTED'
++        Assert-Negative-Diagnostic 'generated-to-rejected' @(Test-Fixture $mutated 'i1c_01_initial_valid.json') 'expected.finalOutcome must be GENERATED'
++    }
++    else { Assert-Negative-Diagnostic 'generated-to-rejected' @() 'expected.finalOutcome must be GENERATED' }
++
++    # 4. generated-to-error
++    if ($byId.ContainsKey('I1C-01')) {
++        $mutated = Copy-Fixture $byId['I1C-01']
++        $mutated.expected.finalOutcome = 'ERROR'
++        Assert-Negative-Diagnostic 'generated-to-error' @(Test-Fixture $mutated 'i1c_01_initial_valid.json') 'expected.finalOutcome must be GENERATED'
++    }
++    else { Assert-Negative-Diagnostic 'generated-to-error' @() 'expected.finalOutcome must be GENERATED' }
++
++    # 5. incorrect-http-status
++    if ($byId.ContainsKey('I1C-01')) {
++        $mutated = Copy-Fixture $byId['I1C-01']
++        $mutated.expected.finalHttpStatus = 500
++        Assert-Negative-Diagnostic 'incorrect-http-status' @(Test-Fixture $mutated 'i1c_01_initial_valid.json') 'expected.finalHttpStatus must be 200'
++    }
++    else { Assert-Negative-Diagnostic 'incorrect-http-status' @() 'expected.finalHttpStatus must be 200' }
++
++    # 6. incorrect-error-code
++    if ($byId.ContainsKey('I1D-06')) {
++        $mutated = Copy-Fixture $byId['I1D-06']
++        $mutated.expected.errorCode = 'AI_EXTRACTION_ERROR'
++        Assert-Negative-Diagnostic 'incorrect-error-code' @(Test-Fixture $mutated 'i1d_06_backend_error.json') 'expected.errorCode must be INTERNAL_ERROR'
++    }
++    else { Assert-Negative-Diagnostic 'incorrect-error-code' @() 'expected.errorCode must be INTERNAL_ERROR' }
++
++    # 7. invalid-requestId
++    if ($byId.ContainsKey('I1C-02')) {
++        $mutated = Copy-Fixture $byId['I1C-02']
++        $mutated.input.events[1].body.requestId = 'not-a-uuid'
++        Assert-Negative-Diagnostic 'invalid-requestId' @(Test-Fixture $mutated 'i1c_02_second_turn_complete.json') 'input.events[1].body.requestId must be a UUID v4'
++    }
++    else { Assert-Negative-Diagnostic 'invalid-requestId' @() 'input.events[1].body.requestId must be a UUID v4' }
++
++    # 8. inconsistent-requestId
++    if ($byId.ContainsKey('I1C-01')) {
++        $mutated = Copy-Fixture $byId['I1C-01']
++        $e1Stub = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E1' })
++        if ($e1Stub.Count -gt 0) { $e1Stub[0].body.requestId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }
++        Assert-Negative-Diagnostic 'inconsistent-requestId' @(Test-Fixture $mutated 'i1c_01_initial_valid.json') 'requestId does not match expected.requestId'
++    }
++    else { Assert-Negative-Diagnostic 'inconsistent-requestId' @() 'requestId does not match expected.requestId' }
++
++    # 9. inconsistent-documentId
++    if ($byId.ContainsKey('I1C-01')) {
++        $mutated = Copy-Fixture $byId['I1C-01']
++        $e6Stub = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E6' })
++        if ($e6Stub.Count -gt 0) { $e6Stub[0].body.documentId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }
++        Assert-Negative-Diagnostic 'inconsistent-documentId' @(Test-Fixture $mutated 'i1c_01_initial_valid.json') 'documentId does not match expected.documentId'
++    }
++    else { Assert-Negative-Diagnostic 'inconsistent-documentId' @() 'documentId does not match expected.documentId' }
++
++    # 10. inconsistent-missingFields
++    if ($byId.ContainsKey('I1C-03')) {
++        $mutated = Copy-Fixture $byId['I1C-03']
++        $e1Stub = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E1' })
++        if ($e1Stub.Count -gt 0) { $e1Stub[0].body.missingFields = @('dateNaissance') }
++        Assert-Negative-Diagnostic 'inconsistent-missingFields' @(Test-Fixture $mutated 'i1c_03_missing_information.json') 'missingFields do not match expected.missingFields'
++    }
++    else { Assert-Negative-Diagnostic 'inconsistent-missingFields' @() 'missingFields do not match expected.missingFields' }
++
++    # 11. stub-count-mismatch
++    if ($byId.ContainsKey('I1C-01')) {
++        $mutated = Copy-Fixture $byId['I1C-01']
++        $mutated.stubs = @($mutated.stubs | Select-Object -Skip 1)
++        Assert-Negative-Diagnostic 'stub-count-mismatch' @(Test-Fixture $mutated 'i1c_01_initial_valid.json') 'stub count for'
++    }
++    else { Assert-Negative-Diagnostic 'stub-count-mismatch' @() 'stub count for' }
++
++    # 12. duplicate-fixtureId
++    if ($byId.ContainsKey('I1C-01') -and $byId.ContainsKey('I1C-02')) {
++        $mutated = Copy-Fixture $byId['I1C-02']
++        $mutated.fixtureId = 'I1C-01'
++        Assert-Negative-Diagnostic 'duplicate-fixtureId' @(Test-Uniqueness @($byId['I1C-01'], $mutated)) 'duplicate fixtureId'
++    }
++    else { Assert-Negative-Diagnostic 'duplicate-fixtureId' @() 'duplicate fixtureId' }
++
++    # 13. missing-pii-markers
++    if ($byId.ContainsKey('I1D-09')) {
++        $mutated = Copy-Fixture $byId['I1D-09']
++        $mutated.securityProbe.markers = @()
++        Assert-Negative-Diagnostic 'missing-pii-markers' @(Test-Fixture $mutated 'i1d_09_fictitious_pii.json') 'at least four PII markers'
++    }
++    else { Assert-Negative-Diagnostic 'missing-pii-markers' @() 'at least four PII markers' }
++
++    # 14. pii-marker-absent-from-payload
++    if ($byId.ContainsKey('I1D-09')) {
++        $mutated = Copy-Fixture $byId['I1D-09']
++        $mutated.input.events[0].body.message = $mutated.input.events[0].body.message.Replace('FAKE-PP-0001', 'FAKE-PP-XXXX')
++        Assert-Negative-Diagnostic 'pii-marker-absent-from-payload' @(Test-Fixture $mutated 'i1d_09_fictitious_pii.json') 'absent from the analyzed payload'
++    }
++    else { Assert-Negative-Diagnostic 'pii-marker-absent-from-payload' @() 'absent from the analyzed payload' }
++
++    # 15. binary-signature-absent
++    if ($byId.ContainsKey('I1D-10')) {
++        $mutated = Copy-Fixture $byId['I1D-10']
++        $e5Stub = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E5' })
++        if ($e5Stub.Count -gt 0) { $e5Stub[0].body.PSObject.Properties.Remove('documentBase64') }
++        Assert-Negative-Diagnostic 'binary-signature-absent' @(Test-Fixture $mutated 'i1d_10_binary_content.json') 'absent from the analyzed payload'
++    }
++    else { Assert-Negative-Diagnostic 'binary-signature-absent' @() 'absent from the analyzed payload' }
++
++    # 16. bad-binary-magic
++    if ($byId.ContainsKey('I1D-10')) {
++        $mutated = Copy-Fixture $byId['I1D-10']
++        $mutated.securityProbe.base64 = 'AAAA'
++        $e5Stub = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E5' })
++        if ($e5Stub.Count -gt 0) { $e5Stub[0].body.documentBase64 = 'AAAA' }
++        Assert-Negative-Diagnostic 'bad-binary-magic' @(Test-Fixture $mutated 'i1d_10_binary_content.json') 'does not start with'
++    }
++    else { Assert-Negative-Diagnostic 'bad-binary-magic' @() 'does not start with' }
++
++    # 17. step-order-i1c-05
++    if ($byId.ContainsKey('I1C-05')) {
++        $mutated = Copy-Fixture $byId['I1C-05']
++        $e2Stubs = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E2' })
++        $otherStubs = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -ne 'E2' })
++        $mutated.stubs = @($otherStubs + $e2Stubs)
++        Assert-Negative-Diagnostic 'step-order-i1c-05' @(Test-Fixture $mutated 'i1c_05_round2_incomplete.json') 'I1C-05 E2 must occur before'
++    }
++    else { Assert-Negative-Diagnostic 'step-order-i1c-05' @() 'I1C-05 E2 must occur before' }
++
++    # 18. e3-http-i1c-05
++    if ($byId.ContainsKey('I1C-05')) {
++        $mutated = Copy-Fixture $byId['I1C-05']
++        $e3Stub = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E3' })
++        if ($e3Stub.Count -gt 0) {
++            $e3Stub[0].mode = 'error'
++            $e3Stub[0].httpStatus = 422
++        }
++        Assert-Negative-Diagnostic 'e3-http-i1c-05' @(Test-Fixture $mutated 'i1c_05_round2_incomplete.json') 'I1C-05 E3 must be a success 200'
++    }
++    else { Assert-Negative-Diagnostic 'e3-http-i1c-05' @() 'I1C-05 E3 must be a success 200' }
++
++    # 19. step-order-i1c-02
++    if ($byId.ContainsKey('I1C-02')) {
++        $mutated = Copy-Fixture $byId['I1C-02']
++        $e2Stubs = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E2' })
++        $otherStubs = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -ne 'E2' })
++        $mutated.stubs = @($otherStubs + $e2Stubs)
++        Assert-Negative-Diagnostic 'step-order-i1c-02' @(Test-Fixture $mutated 'i1c_02_second_turn_complete.json') 'I1C-02 E2 must occur before'
++    }
++    else { Assert-Negative-Diagnostic 'step-order-i1c-02' @() 'I1C-02 E2 must occur before' }
++
++    # 20. step-order-i1d-05
++    if ($byId.ContainsKey('I1D-05')) {
++        $mutated = Copy-Fixture $byId['I1D-05']
++        $firstStub = $mutated.stubs[0]
++        $mutated.stubs[0] = $mutated.stubs[1]
++        $mutated.stubs[1] = $firstStub
++        Assert-Negative-Diagnostic 'step-order-i1d-05' @(Test-Fixture $mutated 'i1d_05_duplicate_message.json') 'I1D-05 E2 must be the first call'
++    }
++    else { Assert-Negative-Diagnostic 'step-order-i1d-05' @() 'I1D-05 E2 must be the first call' }
++
++    # 21. utf8-bom-rejected
++    $bomBytes = [byte[]](0xEF, 0xBB, 0xBF, 0x7B, 0x7D)
++    $bomResult = Test-Utf8NoBom $bomBytes
++    Assert-Negative-Diagnostic 'utf8-bom-rejected' @($bomResult.Reason) 'UTF-8 BOM present'
++
++    # 22. message-place-absent ÔÇö birth place in the message, absent from the paired extraction
++    if ($byId.ContainsKey('I1C-05')) {
++        $mutated = Copy-Fixture $byId['I1C-05']
++        $mutated.input.events[1].body.message = 'N' + [char]0x00E9 + 'e le 01/01/1980 ' + [char]0x00E0 + ' Ville-Fictive.'
++        Assert-Negative-Diagnostic 'message-place-absent' @(Test-Fixture $mutated 'i1c_05_round2_incomplete.json') 'message birth place is absent from the paired extraction'
++    }
++    else { Assert-Negative-Diagnostic 'message-place-absent' @() 'message birth place is absent from the paired extraction' }
++
++    # 23. message-date-absent ÔÇö birth date in the message, absent from the paired extraction
++    if ($byId.ContainsKey('I1C-03')) {
++        $mutated = Copy-Fixture $byId['I1C-03']
++        $mutated.input.events[0].body.message = 'Attestation fictive, n' + [char]0x00E9 + 'e le 02/02/1990, nom incorrect Camil Fictif, nom correct Camille Fictive.'
++        Assert-Negative-Diagnostic 'message-date-absent' @(Test-Fixture $mutated 'i1c_03_missing_information.json') 'message birth date is absent from the paired extraction'
++    }
++    else { Assert-Negative-Diagnostic 'message-date-absent' @() 'message birth date is absent from the paired extraction' }
++
++    # 24. delta-missing-undeclared ÔÇö drop one mandatory key still absent from the delta payload
++    if ($byId.ContainsKey('I1C-02')) {
++        $mutated = Copy-Fixture $byId['I1C-02']
++        $e2Index = -1
++        for ($i = 0; $i -lt @($mutated.stubs).Count; $i++) {
++            if ((Get-Prop $mutated.stubs[$i] 'stage') -eq 'E2') { $e2Index = $i; break }
++        }
++        $delta = $null
++        if ($e2Index -ge 0) {
++            for ($i = $e2Index + 1; $i -lt @($mutated.stubs).Count; $i++) {
++                $candidate = $mutated.stubs[$i]
++                if ((Get-Prop $candidate 'stage') -eq 'OLLAMA' -and (Get-Prop $candidate 'mode') -eq 'success') {
++                    $delta = $candidate
++                    break
++                }
++            }
++        }
++        if ($null -ne $delta) {
++            $mandatory = @('prenom', 'nom', 'dateNaissance', 'lieuNaissance', 'nomIncorrect', 'nomCorrect')
++            $data = Get-Prop (Get-Prop $delta 'body') 'data'
++            $absent = New-Object System.Collections.Generic.List[string]
++            foreach ($key in $mandatory) {
++                if (-not (Has-Prop $data $key)) { [void]$absent.Add($key) }
++            }
++            $truncated = @()
++            if ($absent.Count -gt 1) { $truncated = @($absent.ToArray()[0..($absent.Count - 2)]) }
++            $delta.body.missingFields = [object[]]$truncated
++        }
++        Assert-Negative-Diagnostic 'delta-missing-undeclared' @(Test-Fixture $mutated 'i1c_02_second_turn_complete.json') 'delta extraction missingFields must redeclare every mandatory key absent from data'
++    }
++    else { Assert-Negative-Diagnostic 'delta-missing-undeclared' @() 'delta extraction missingFields must redeclare every mandatory key absent from data' }
++
++    # 25. error-code-absent ÔÇö 422 backend body without ErrorResponse.code
++    if ($byId.ContainsKey('I1C-03')) {
++        $mutated = Copy-Fixture $byId['I1C-03']
++        $e1Stub = @($mutated.stubs | Where-Object { (Get-Prop $_ 'stage') -eq 'E1' })
++        if ($e1Stub.Count -gt 0) { $e1Stub[0].body.PSObject.Properties.Remove('code') }
++        Assert-Negative-Diagnostic 'error-code-absent' @(Test-Fixture $mutated 'i1c_03_missing_information.json') 'backend 422/400 body.code is absent'
++    }
++    else { Assert-Negative-Diagnostic 'error-code-absent' @() 'backend 422/400 body.code is absent' }
++
++    Write-Output ("SELFTEST_PASSED={0} SELFTEST_FAILED={1}" -f $script:SelfTestPassed, $script:SelfTestFailed)
++    if ($script:SelfTestFailed -gt 0) { $script:Failures += $script:SelfTestFailed }
++}
++
++Write-Output ("PASSED={0} FAILED={1}" -f $script:Passed, $script:Failures)
++if ($script:Failures -eq 0) {
++    Write-Output 'RESULT: PASS'
++    exit 0
++}
++Write-Output 'RESULT: FAIL'
++exit 1

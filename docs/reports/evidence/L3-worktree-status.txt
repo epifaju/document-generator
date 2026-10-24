@@ -1,0 +1,20 @@
+﻿ D .cursor/agents/cursor_agents_adgendoc.md
+ M docs/PRD_adgendoc_v2_1_Cursor.md
+ M docs/adr/ADR-001-e3-regle-metier-400.md
+ M docs/n8n-orchestration.md
+ M docs/reports/L3-coherence-fixtures.md
+ M requirements/API_CONTRACTS.md
+ M requirements/N8N_CONTRACTS.md
+?? .cursor/agents/ai-engineer.md
+?? .cursor/agents/architect.md
+?? .cursor/agents/backend-developer.md
+?? .cursor/agents/business-analyst.md
+?? .cursor/agents/database-engineer.md
+?? .cursor/agents/n8n-developer.md
+?? .cursor/agents/reviewer.md
+?? .cursor/agents/security.md
+?? .cursor/agents/tester.md
+?? docs/packs/
+?? docs/reports/L0c-Q01.md
+?? docs/reports/evidence/
+?? split_cursor_packs.ps1

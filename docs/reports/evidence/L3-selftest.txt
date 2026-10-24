@@ -1,0 +1,43 @@
+﻿DG-I1-FIXTURES-001 static validator
+fixtureDir=C:\Users\epifa\cursor-workspace\document-generator\tests\n8n\fixtures
+PASS i1c_01_initial_valid.json
+PASS i1c_02_second_turn_complete.json
+PASS i1c_03_missing_information.json
+PASS i1c_04_invalid_request_reference.json
+PASS i1c_05_round2_incomplete.json
+PASS i1d_05_duplicate_message.json
+PASS i1d_06_backend_error.json
+PASS i1d_07_ollama_unavailable.json
+PASS i1d_08_timeout.json
+PASS i1d_09_fictitious_pii.json
+PASS i1d_10_binary_content.json
+PASS fixture identifiers unique
+--- SELF-TEST (negative mutations) ---
+SELFTEST missing-finalOutcome PASS
+SELFTEST invalid-finalOutcome PASS
+SELFTEST generated-to-rejected PASS
+SELFTEST generated-to-error PASS
+SELFTEST incorrect-http-status PASS
+SELFTEST incorrect-error-code PASS
+SELFTEST invalid-requestId PASS
+SELFTEST inconsistent-requestId PASS
+SELFTEST inconsistent-documentId PASS
+SELFTEST inconsistent-missingFields PASS
+SELFTEST stub-count-mismatch PASS
+SELFTEST duplicate-fixtureId PASS
+SELFTEST missing-pii-markers PASS
+SELFTEST pii-marker-absent-from-payload PASS
+SELFTEST binary-signature-absent PASS
+SELFTEST bad-binary-magic PASS
+SELFTEST step-order-i1c-05 PASS
+SELFTEST e3-http-i1c-05 PASS
+SELFTEST step-order-i1c-02 PASS
+SELFTEST step-order-i1d-05 PASS
+SELFTEST utf8-bom-rejected PASS
+SELFTEST message-place-absent PASS
+SELFTEST message-date-absent PASS
+SELFTEST delta-missing-undeclared PASS
+SELFTEST error-code-absent PASS
+SELFTEST_PASSED=25 SELFTEST_FAILED=0
+PASSED=12 FAILED=0
+RESULT: PASS

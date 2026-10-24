@@ -1,0 +1,39 @@
+﻿b113e87 multi-agent cursor
+ .cursor/agents/cursor_agents_adgendoc.md           |  194 +++
+ .cursor/rules/00-project-context.mdc               |   27 +
+ .cursor/rules/10-architecture.mdc                  |   15 +
+ .cursor/rules/20-testing.mdc                       |   15 +
+ .cursor/rules/30-api-contracts.mdc                 |   18 +
+ .cursor/rules/40-docx-generation.mdc               |   12 +
+ .cursor/rules/50-security-pii.mdc                  |   12 +
+ =ro                                                |    0
+ AGENTS.md                                          |  192 ++-
+ docs/PRD_adgendoc_v2_1_Cursor.md                   |  436 +++++++
+ docs/adr/ADR-001-e3-regle-metier-400.md            |   46 +
+ docs/adr/ADR-002-e3-missing-information-200.md     |   47 +
+ docs/adr/ADR-003-correlation-id-chaine.md          |   47 +
+ docs/adr/ADR-004-rejected-terminal.md              |   48 +
+ docs/adr/ADR-005-compteur-tours-clarification.md   |   48 +
+ docs/adr/ADR-006-unicite-document-et-e1.md         |   44 +
+ docs/adr/ADR-007-requires-business-validation.md   |   47 +
+ docs/adr/ADR-008-contrats-proposes-et-oq-api.md    |   64 +
+ docs/adr/ADR-009-e2-data-et-e6-sans-auth.md        |   50 +
+ docs/adr/ADR-010-contacts-hors-template.md         |   50 +
+ docs/adr/ADR-011-purge-et-retention.md             |   49 +
+ docs/reports/L1-i1c-05-validateur.md               |  194 +++
+ docs/reports/L3-coherence-fixtures.md              |  222 ++++
+ opencode.json                                      |  304 +++++
+ tests/n8n/FIXTURES_I1.md                           |  239 ++++
+ tests/n8n/fixtures/i1c_01_initial_valid.json       |  118 ++
+ .../n8n/fixtures/i1c_02_second_turn_complete.json  |  133 ++
+ tests/n8n/fixtures/i1c_03_missing_information.json |   88 ++
+ .../fixtures/i1c_04_invalid_request_reference.json |   49 +
+ tests/n8n/fixtures/i1c_05_round2_incomplete.json   |  141 +++
+ tests/n8n/fixtures/i1d_05_duplicate_message.json   |  112 ++
+ tests/n8n/fixtures/i1d_06_backend_error.json       |  119 ++
+ tests/n8n/fixtures/i1d_07_ollama_unavailable.json  |   71 ++
+ tests/n8n/fixtures/i1d_08_timeout.json             |   71 ++
+ tests/n8n/fixtures/i1d_09_fictitious_pii.json      |  127 ++
+ tests/n8n/fixtures/i1d_10_binary_content.json      |  123 ++
+ tests/n8n/validate_i1_fixtures.ps1                 | 1280 ++++++++++++++++++++
+ 37 files changed, 4838 insertions(+), 14 deletions(-)
