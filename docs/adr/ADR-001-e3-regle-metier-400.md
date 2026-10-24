@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Question | Q-01 |
-| Statut | **PROPOSÉ** |
+| Statut | **ACCEPTÉ** |
 | Date | 2026-10-24 |
 | Périmètre | Itération 1 — documentation. Aucun code, contrat ou test modifié par ce fichier. |
 | Hors numérotation | Ne remplace pas le tableau ADR-01…ADR-14 de `docs/architecture.md:117-132`. |
@@ -32,7 +32,7 @@ Le code suit la ligne 400 métier : `backend/src/main/java/com/adgendoc/api/Docu
 
 | Zone | Effet |
 |---|---|
-| Contrats | Édition documentaire ultérieure, après accord : retirer T10 / `REJECTED` de la cellule 200 (`API_CONTRACTS.md:341`) ; réécrire `N8N_CONTRACTS.md:423` pour qu'un PATCH 400 persisté `REJECTED` produise l'outcome `REJECTED`. `N8N_CONTRACTS.md:170` reste la table normative. |
+| Contrats | Appliqué par le lot L0c-Q01 : T10 / `REJECTED` retiré de la cellule 200 (`API_CONTRACTS.md:341`) ; `N8N_CONTRACTS.md:423` route un PATCH `400` métier persisté `REJECTED` vers l'outcome `REJECTED`. `N8N_CONTRACTS.md:170` reste la table normative. |
 | Code E1–E8 | Aucun changement de chemin, de code HTTP ni de `ErrorResponse`. |
 | Tests | Le cas 400 existant demeure. Un contrôle statique du workflow doit exiger l'outcome `REJECTED` pour ce 400 métier, et `INVALID_REQUEST` pour le 400 non mutant. Gate G5. Ce contrôle n'est pas écrit ici. |
 | n8n | Si le graphe range aujourd'hui tout 400 E3 en `INVALID_REQUEST` ou `ERROR`, c'est un écart au contrat `N8N_CONTRACTS.md:170`, à corriger dans un lot workflow séparé. L'audit G0 n'a pas exécuté le webhook : le routage réel est **inconnu à l'exécution**. |
@@ -43,4 +43,10 @@ Option 1. Le comportement codé et testé (400, statut persisté `REJECTED`) est
 
 Lot : L0c pour le texte des contrats, puis le lot « figer Q-01 » (assertion statique workflow, gate G5) décrit par l'audit G0. Pas de lot de changement HTTP.
 
-Statut de cet ADR : **PROPOSÉ**. L'arbitrage reste humain.
+## Décision
+
+Décision humaine, 2026-10-24. Option 1 retenue. Les options 2 et 3 restent dans l'historique et ne sont pas retenues.
+
+Le contexte et l'option 2 décrivent l'écart avant le lot L0c-Q01. Ce lot aligne `requirements/API_CONTRACTS.md:341`, `requirements/N8N_CONTRACTS.md:423` et la ligne E3 `200` de `docs/n8n-orchestration.md`.
+
+Statut de cet ADR : **ACCEPTÉ**.

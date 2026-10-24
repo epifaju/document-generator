@@ -174,9 +174,10 @@ Conforme à `docs/architecture.md` §1.4 + contrat §5 :
    déterministement (`502`, cas couvert par la fixture I-D).
 3. E8 (garde de forme) → **E3 `PATCH` payload plat**, corps = **seuls les
    champs fournis** (API_CONTRACTS §3.3).
-4. Routage PATCH : `VALIDATED` → E4 → E5 → E6 (fin de boucle) ;
-   toujours `MISSING_INFORMATION` (T6b) → outcome `MISSING_INFORMATION`
-   (round suivant) ; `REJECTED` → outcome `REJECTED` (terminal) ;
+4. Routage PATCH : `200` + `VALIDATED` → E4 → E5 → E6 (fin de boucle) ;
+   `200` + toujours `MISSING_INFORMATION` (T6b) → outcome `MISSING_INFORMATION`
+   (round suivant) ; `400` métier persisté `REJECTED` (T4 / T6 / T10 / T12b)
+   → outcome `REJECTED` (terminal) ;
    `409 REQUEST_ALREADY_CLOSED` → E2 → route.
 5. **Borne** : `MAX_CLARIFICATION_ROUNDS = 5` → outcome
    `CLARIFICATION_LIMIT_REACHED` (contrat §4).
@@ -235,7 +236,7 @@ pour l'injoignabilité.
 | 9 | E1 | `400` sans `requestId` | rejet enveloppe | `400 INVALID_REQUEST` | non persistée |
 | 10 | E1 | `5xx` **reçu** | retry (2) puis arrêt | `500 INTERNAL_ERROR` (R1) | tx annulée → retry sûr **sauf échec post-commit (audit)** → doublon tracé `F-I-1` |
 | 11 | E1 | timeout / connexion perdue | **aucun retry** | `503` + `correlationId` | ambiguïté → réconciliation audit (`F-I-1`) |
-| 12 | E3 | `200` | route par statut (§3.3/§5) | `GENERATED`/`MISSING`/`REJECTED` | jamais de DRAFT (T-…) |
+| 12 | E3 | `200` | route par statut (§3.3/§5) | `GENERATED`/`MISSING` | jamais de DRAFT (T-…) |
 | 13 | E3 | `400` structurel (clé inconnue/réservée) | **bug n8n** (il n'envoie que des clés du schéma) | `400 INVALID_REQUEST` + log ERROR | 0 mutation (contrat F-03) |
 | 14 | E3 | `400` métier | rejet | `200 REJECTED` | persistée T6/T10 |
 | 15 | E3 | `409 REQUEST_ALREADY_CLOSED` | E2 → route | `GENERATED`/`REJECTED` | jamais de décision sur la réponse 409 seule |

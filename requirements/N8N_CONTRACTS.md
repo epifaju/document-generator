@@ -420,7 +420,8 @@ Règles de réconciliation (issue ambiguë, design anti-doublon) :
 |---|---|
 | Round 1 (sans `requestId`) | extraction → E8 → E1 ; `422` → outcome `MISSING_INFORMATION` (requestId désormais obligatoire côté client) |
 | Rounds ≥ 2 (avec `requestId`) | **E2 d'abord** (état courant) → extraction delta (hint = `missingFields` connus) → E8 → **E3 `PATCH` payload plat** (API_CONTRACTS §3.3 : `{"dateNaissance": "...", "lieuNaissance": "..."}`) — uniquement les champs fournis. **Invariant de forme chaque round** : seul `data` est partiel ; l'enveloppe reste valide en entier — `missingFields` re-déclare **toutes** les clés obligatoires encore absentes (règle `allOf` du schéma d'extraction), sinon E8 rejetterait un round pourtant correct (`502` — fixture gate I-D) |
-| PATCH `200` | routage par statut : `VALIDATED` → E4 puis E5 ; toujours `MISSING_INFORMATION` → outcome `MISSING_INFORMATION` (T6b) ; `REJECTED` → outcome `REJECTED` |
+| PATCH `200` | routage par statut : `VALIDATED` → E4 puis E5 ; toujours `MISSING_INFORMATION` → outcome `MISSING_INFORMATION` (T6b) |
+| PATCH `400` métier | `VALIDATION_ERROR`, statut persisté `REJECTED` (T4 / T6 / T10 / T12b) → outcome `REJECTED` |
 | PATCH `409 REQUEST_ALREADY_CLOSED` | E2 → route (`GENERATED` → succès ; `REJECTED` → `REJECTED`) |
 | Borne | `MAX_CLARIFICATION_ROUNDS = 5` (compteur interne n8n, cf. architecture §5 : meilleure estimation, la correction du flux n'en dépend pas) |
 | Jamais | valeur suggérée/inventée, `missingFields` réordonné, donnée renvoyée au LLM (minimisation PII), complétion d'une demande existante par une nouvelle création **lorsque le client renvoie son `requestId`** (OQ-2 — cf. contrat client ci-dessous) |
@@ -474,7 +475,9 @@ requise pour la correction du flux ; la reprise se fait uniquement par
 - Contrat `v1`, statut PROPOSÉ (Phase I.0). Toute modification après
   approbation exige une révision par Architect + Reviewer et une entrée
   dans l'historique ci-dessous.
-- Historique : `v1` — 2026-10-04 — création (Phase I.0).
+- Historique :
+  - `v1` — 2026-10-04 — création (Phase I.0).
+  - `v1` — 2026-10-24 — Q-01, ADR-001 : le PATCH `200` ne route plus `REJECTED` ; un `400` métier persisté `REJECTED` (T4 / T6 / T10 / T12b) produit l'outcome `REJECTED`.
 
 ---
 
