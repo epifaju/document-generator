@@ -1032,6 +1032,46 @@ class DocumentRequestControllerTest {
         assertUnchanged(requestId, before);
     }
 
+    @Test
+    void e3_patch_on_validated_request_with_broken_rule_returns_400_rejected() throws Exception {
+        // API_CONTRACTS §3.3, ADR-001 : règle métier depuis VALIDATED → 400,
+        // persisté REJECTED (T10).
+        UUID requestId = createRequest(validBody());
+        StoredRequest before = capture(requestId);
+
+        mockMvc.perform(patch("/api/v1/requests/" + requestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nom\":\"Gomes@123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.status").value("REJECTED"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("nom"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_FORMAT_TEXTE_INVALIDE"))
+                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
+
+        assertOnlyRejectedNomChanged(requestId, before);
+    }
+
+    @Test
+    void e3_patch_on_failed_request_with_broken_rule_returns_400_rejected() throws Exception {
+        // API_CONTRACTS §3.3, ADR-001 : règle métier depuis FAILED → 400,
+        // persisté REJECTED (T12b).
+        UUID requestId = createFailedRequest();
+        StoredRequest before = capture(requestId);
+
+        mockMvc.perform(patch("/api/v1/requests/" + requestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nom\":\"Gomes@123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.status").value("REJECTED"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("nom"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_FORMAT_TEXTE_INVALIDE"))
+                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
+
+        assertOnlyRejectedNomChanged(requestId, before);
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
@@ -1182,6 +1222,21 @@ class DocumentRequestControllerTest {
 
     private void assertUnchanged(UUID requestId, StoredRequest before) {
         assertThat(capture(requestId)).isEqualTo(before);
+    }
+
+    private void assertOnlyRejectedNomChanged(UUID requestId, StoredRequest before) {
+        DocumentRequest stored = requestRepository.store.get(requestId);
+        assertThat(stored.getRequestId()).isEqualTo(requestId);
+        assertThat(stored.getStatus()).isEqualTo(RequestStatus.REJECTED);
+        assertThat(stored.getMissingFields()).isEqualTo(before.missingFields());
+        assertThat(stored.getVersion()).isEqualTo(before.version());
+        assertThat(documentRepository.store).hasSize(before.documentCount());
+        assertThat(requestRepository.saveCount).isEqualTo(before.saveCount() + 1);
+
+        Map<String, Object> beforeData = new LinkedHashMap<>(before.data());
+        Map<String, Object> afterData = new LinkedHashMap<>(stored.getData());
+        assertThat(afterData.remove("nom")).isNotEqualTo(beforeData.remove("nom"));
+        assertThat(afterData).isEqualTo(beforeData);
     }
 
     private record StoredRequest(RequestStatus status, Map<String, Object> data,

@@ -1,0 +1,9 @@
+ M backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
+ M docs/PRD_adgendoc_v2_1_Cursor.md
+?? docs/reports/D0c-prd-12-1.md
+?? docs/reports/evidence/LD0C-diff.txt
+?? docs/reports/evidence/LD2-diff-stat.txt
+?? docs/reports/evidence/LD2-diff.txt
+?? docs/reports/evidence/LD2-git-status.txt
+?? docs/reports/evidence/LD2-index.txt
+?? docs/reports/evidence/LD2-mvn-test.txt
