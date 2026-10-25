@@ -1,0 +1,168 @@
+diff --git a/backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java b/backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
+index 2f4fadb..c23767f 100644
+--- a/backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
++++ b/backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
+@@ -5,10 +5,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
+ import org.apache.poi.xwpf.usermodel.XWPFDocument;
+ import org.junit.jupiter.api.Assumptions;
+ import org.junit.jupiter.api.BeforeAll;
++import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.MethodOrderer;
+ import org.junit.jupiter.api.Order;
+ import org.junit.jupiter.api.Test;
+ import org.junit.jupiter.api.TestMethodOrder;
++import org.junit.jupiter.api.io.TempDir;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.server.LocalServerPort;
++import org.springframework.test.context.DynamicPropertyRegistry;
++import org.springframework.test.context.DynamicPropertySource;
++import org.testcontainers.containers.PostgreSQLContainer;
++import org.testcontainers.junit.jupiter.Container;
++import org.testcontainers.junit.jupiter.Testcontainers;
+ 
+ import java.io.ByteArrayInputStream;
+ import java.io.IOException;
+@@ -25,6 +34,7 @@ import java.net.http.HttpResponse;
+ import java.nio.charset.StandardCharsets;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
++import java.nio.file.StandardCopyOption;
+ import java.security.MessageDigest;
+ import java.security.NoSuchAlgorithmException;
+ import java.sql.Connection;
+@@ -41,37 +51,25 @@ import java.util.UUID;
+ import static org.assertj.core.api.Assertions.assertThat;
+ 
+ /**
+- * <b>GATE HTTP E2E — Phase H-HTTP (HTTP Vertical Slice E2E)</b> (exécuté
+- * SÉPARÉMENT du gate hors-ligne et du gate PostgreSQL, serveur Spring Boot +
+- * PostgreSQL 16 réels requis) :
++ * <b>GATE HTTP — slice verticale loopback</b> (profil Maven {@code it},
++ * PostgreSQL éphémère Testcontainers, serveur Spring Boot dans la même JVM) :
+  *
+  * <pre>
+- * mvn -o -f backend/pom.xml test -Dtest=HttpVerticalSliceIT
++ * mvnw.cmd -B -Pit -Dit.test=HttpVerticalSliceIT verify
+  * </pre>
+  *
+- * <p>Aucun MockMvc, aucun double de persistence : le client est
++ * <p>Aucun MockMvc, aucun double de persistance : le client est
+  * {@link java.net.http.HttpClient} du JDK, les appels voyagent en TCP réel
+- * vers le serveur Spring Boot démarré hors JVM de test, et les vérifications
+- * de persistance passent par du JDBC réel sur PostgreSQL.</p>
+- *
+- * <p>Configuration (variables d'environnement, exigées sauf valeur par
+- * défaut) :</p>
+- * <ul>
+- *   <li>{@code E2E_BASE_URL} — défaut {@code http://127.0.0.1:18099} ;</li>
+- *   <li>{@code E2E_JDBC_URL} — défaut
+- *       {@code jdbc:postgresql://127.0.0.1:5460/adgendoc} ;</li>
+- *   <li>{@code E2E_JDBC_USER} — défaut {@code adgendoc} ;</li>
+- *   <li>{@code E2E_JDBC_PASSWORD} — obligatoire ;</li>
+- *   <li>{@code E2E_STORAGE_ROOT} — stockage de test du serveur, obligatoire ;</li>
+- *   <li>{@code E2E_TEMPLATE_FILE} — copie de template utilisée par le serveur,
+- *       obligatoire ;</li>
+- *   <li>{@code E2E_REFERENCE_TEMPLATE} — template versionné du dépôt,
+- *       obligatoire.</li>
+- * </ul>
++ * vers le serveur embarqué sur {@code 127.0.0.1} et un port éphémère, et les
++ * vérifications de persistance passent par du JDBC réel sur PostgreSQL.
++ * Le mot de passe vient du conteneur. La copie de template et le stockage
++ * sont des répertoires temporaires, hors du dépôt.</p>
+  *
+  * <p>Les scénarios négatifs sont ordonnés avant le scénario « checksum
+  * altéré », lequel restaure la copie de template dans un {@code finally} :</p>
+  */
++@Testcontainers
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+ @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+ class HttpVerticalSliceIT {
+ 
+@@ -82,17 +80,29 @@ class HttpVerticalSliceIT {
+     private static final String API = "/api/v1/requests";
+     private static final int MAX_PAYLOAD_BYTES = 65536;
+ 
+-    private static final String BASE_URL = env("E2E_BASE_URL",
+-            "http://127.0.0.1:18099");
+-    private static final String JDBC_URL = env("E2E_JDBC_URL",
+-            "jdbc:postgresql://127.0.0.1:5460/adgendoc");
+-    private static final String JDBC_USER = env("E2E_JDBC_USER", "adgendoc");
++    /** Publié par {@link #publishLoopbackBaseUrl()} depuis le port d'instance. */
++    private static String BASE_URL;
++    private static String JDBC_URL;
++    private static String JDBC_USER;
+ 
+     private static String jdbcPassword;
+-    private static Path storageRoot;
++
++    @TempDir
++    static Path storageRoot;
++
++    @TempDir
++    static Path templateDirectory;
++
+     private static Path templateCopy;
+     private static Path referenceTemplate;
+ 
++    /** Spring n'injecte pas {@code @LocalServerPort} sur un champ statique. */
++    @LocalServerPort
++    private int localServerPort;
++
++    @Container
++    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
++
+     private static HttpClient client;
+     private static final ObjectMapper JSON = new ObjectMapper();
+     private static final List<String> NEGATIVE_BODIES = new ArrayList<>();
+@@ -101,25 +111,25 @@ class HttpVerticalSliceIT {
+     // Configuration
+     // ------------------------------------------------------------------
+ 
+-    private static String env(String name, String fallback) {
+-        String value = System.getenv(name);
+-        return value == null || value.isBlank() ? fallback : value;
+-    }
+-
+-    private static String required(String name) {
+-        String value = System.getenv(name);
+-        assertThat(value).as("variable d'environnement %s absente", name)
+-                .isNotBlank();
+-        return value;
++    @DynamicPropertySource
++    static void runtimeProperties(DynamicPropertyRegistry registry) {
++        registry.add("app.document.storage-path", () -> storageRoot.toString());
++        registry.add("app.document.template-dir", () -> templateDirectory.toString());
++        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
++        registry.add("spring.datasource.username", POSTGRES::getUsername);
++        registry.add("spring.datasource.password", POSTGRES::getPassword);
++        registry.add("server.address", () -> "127.0.0.1");
+     }
+ 
+     @BeforeAll
+     static void configure() throws Exception {
+-        jdbcPassword = required("E2E_JDBC_PASSWORD");
+-        storageRoot = Path.of(required("E2E_STORAGE_ROOT")).toAbsolutePath().normalize();
+-        templateCopy = Path.of(required("E2E_TEMPLATE_FILE")).toAbsolutePath().normalize();
+-        referenceTemplate = Path.of(required("E2E_REFERENCE_TEMPLATE"))
++        JDBC_URL = POSTGRES.getJdbcUrl();
++        JDBC_USER = POSTGRES.getUsername();
++        jdbcPassword = POSTGRES.getPassword();
++        referenceTemplate = Path.of("..", "templates", "attestation_concordance_v1.docx")
+                 .toAbsolutePath().normalize();
++        templateCopy = templateDirectory.resolve("attestation_concordance_v1.docx");
++        Files.copy(referenceTemplate, templateCopy, StandardCopyOption.REPLACE_EXISTING);
+ 
+         assertThat(Files.isDirectory(storageRoot))
+                 .as("racine de stockage de test absente : %s", storageRoot).isTrue();
+@@ -144,6 +154,11 @@ class HttpVerticalSliceIT {
+         client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+     }
+ 
++    @BeforeEach
++    void publishLoopbackBaseUrl() {
++        BASE_URL = "http://127.0.0.1:" + localServerPort;
++    }
++
+     // ------------------------------------------------------------------
+     // 0 — Périmètre restreint contrôlé (contrat API §1.3, architecture §12)
+     // ------------------------------------------------------------------

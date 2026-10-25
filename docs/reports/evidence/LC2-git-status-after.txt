@@ -1,0 +1,13 @@
+ M backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
+?? docs/reports/LC2-http-vertical-slice.md
+?? docs/reports/evidence/LC2-diff-names.txt
+?? docs/reports/evidence/LC2-diff-w.txt
+?? docs/reports/evidence/LC2-docker-ps-after.txt
+?? docs/reports/evidence/LC2-docker-ps-before.txt
+?? docs/reports/evidence/LC2-git-status-after.txt
+?? docs/reports/evidence/LC2-git-status-before.txt
+?? docs/reports/evidence/LC2-index-after.txt
+?? docs/reports/evidence/LC2-index-before.txt
+?? docs/reports/evidence/LC2-mvn-test.txt
+?? docs/reports/evidence/LC2-mvn-verify-all.txt
+?? docs/reports/evidence/LC2-mvn-verify-http.txt

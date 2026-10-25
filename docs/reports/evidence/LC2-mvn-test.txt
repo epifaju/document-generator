@@ -1,0 +1,607 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< com.adgendoc:document-generator >-------------------
+[INFO] Building document-generator 1.0.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ document-generator ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- resources:3.3.1:copy-resources (copy-extraction-prompts) @ document-generator ---
+[INFO] Copying 2 resources from ..\prompts\extraction to target\classes\prompts\extraction
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ document-generator ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ document-generator ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ document-generator ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 23 source files with javac [debug parameters release 17] to target\test-classes
+[INFO] /C:/Users/epifa/cursor-workspace/document-generator/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java: C:\Users\epifa\cursor-workspace\document-generator\backend\src\test\java\com\adgendoc\api\DocumentRequestControllerTest.java uses or overrides a deprecated API.
+[INFO] /C:/Users/epifa/cursor-workspace/document-generator/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ document-generator ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.adgendoc.api.DatabaseErrorHandlerTest
+00:00:25.767 [main] ERROR com.adgendoc.api.GlobalExceptionHandler -- Erreur de persistance [errorCode=DATABASE_ERROR, exceptionClass=org.springframework.dao.DataAccessResourceFailureException, sqlState=n/a, correlationId=corr-db-1]
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.371 s -- in com.adgendoc.api.DatabaseErrorHandlerTest
+[INFO] Running com.adgendoc.api.DatabaseErrorLogSanitizationTest
+00:00:25.947 [main] ERROR com.adgendoc.api.GlobalExceptionHandler -- Erreur de persistance [errorCode=DATABASE_ERROR, exceptionClass=org.springframework.dao.DataAccessResourceFailureException, sqlState=23505, correlationId=corr-s1-debug]
+00:00:25.947 [main] DEBUG com.adgendoc.api.GlobalExceptionHandler -- Erreur de persistance � stack trace [correlationId=corr-s1-debug]
+org.springframework.dao.DataAccessResourceFailureException: ERROR: duplicate key value violates unique constraint "document_request_pkey"
+  Detail: Key (prenom, nom, date_naissance)=(Maria, Gomes, 1985-05-12) already exists.
+  SQL: INSERT INTO document_request (prenom, nom, contact_telephone) VALUES ($1, $2, $3)
+  Bind values: [Maria, Gomes, +33612345678]
+  JDBC: jdbc:postgresql://REDACTED user=adgendoc password=REDACTED
+  Authorization: Bearer sk_live_51H8HostileMarker
+
+	at com.adgendoc.api.DatabaseErrorLogSanitizationTest.hostileDatabaseException(DatabaseErrorLogSanitizationTest.java:218)
+	at com.adgendoc.api.DatabaseErrorLogSanitizationTest.stack_trace_is_emitted_at_debug_only(DatabaseErrorLogSanitizationTest.java:185)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:728)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:218)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:214)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:139)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: java.sql.SQLException: ERROR: duplicate key value violates unique constraint "document_request_pkey"
+  Detail: Key (prenom, nom, date_naissance)=(Maria, Gomes, 1985-05-12) already exists.
+  SQL: INSERT INTO document_request (prenom, nom, contact_telephone) VALUES ($1, $2, $3)
+  Bind values: [Maria, Gomes, +33612345678]
+  JDBC: jdbc:postgresql://REDACTED user=adgendoc password=REDACTED
+  Authorization: Bearer sk_live_51H8HostileMarker
+
+	at com.adgendoc.api.DatabaseErrorLogSanitizationTest.hostileDatabaseException(DatabaseErrorLogSanitizationTest.java:217)
+	... 72 common frames omitted
+00:00:25.983 [main] ERROR com.adgendoc.api.GlobalExceptionHandler -- Erreur de persistance [errorCode=DATABASE_ERROR, exceptionClass=org.springframework.dao.DataAccessResourceFailureException, sqlState=23505, correlationId=corr-s1-db]
+00:00:25.984 [main] ERROR com.adgendoc.api.GlobalExceptionHandler -- Erreur interne non g�r�e [errorCode=INTERNAL_ERROR, exceptionClass=java.lang.IllegalStateException, sqlState=n/a, correlationId=corr-s1-unexpected]
+00:00:25.987 [main] ERROR com.adgendoc.api.GlobalExceptionHandler -- �chec de g�n�ration [errorCode=DOCUMENT_GENERATION_ERROR, exceptionClass=com.adgendoc.domain.exceptions.DocumentGenerationException, sqlState=23505, correlationId=corr-s1-generation]
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s -- in com.adgendoc.api.DatabaseErrorLogSanitizationTest
+[INFO] Running com.adgendoc.api.DocumentGenerationFlowTest
+00:00:26.290 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.adgendoc.api.DocumentGenerationFlowTest]: DocumentGenerationFlowTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:00:26.573 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.adgendoc.DocumentGeneratorApplication for test class com.adgendoc.api.DocumentGenerationFlowTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.3.13)
+
+2026-10-26T00:00:27.445+01:00  INFO 27844 --- [document-generator] [           main] c.a.api.DocumentGenerationFlowTest       : Starting DocumentGenerationFlowTest using Java 17.0.10 with PID 27844 (started by epifa in C:\Users\epifa\cursor-workspace\document-generator\backend)
+2026-10-26T00:00:27.448+01:00  INFO 27844 --- [document-generator] [           main] c.a.api.DocumentGenerationFlowTest       : The following 1 profile is active: "test"
+2026-10-26T00:00:29.287+01:00  INFO 27844 --- [document-generator] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-26T00:00:29.416+01:00  INFO 27844 --- [document-generator] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 112 ms. Found 4 JPA repository interfaces.
+2026-10-26T00:00:30.375+01:00  INFO 27844 --- [document-generator] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-26T00:00:30.554+01:00  INFO 27844 --- [document-generator] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.3.Final
+2026-10-26T00:00:30.657+01:00  INFO 27844 --- [document-generator] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-26T00:00:31.860+01:00  INFO 27844 --- [document-generator] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-26T00:00:31.961+01:00  INFO 27844 --- [document-generator] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-26T00:00:32.461+01:00  INFO 27844 --- [document-generator] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:adgendoc_docflow user=SA
+2026-10-26T00:00:32.465+01:00  INFO 27844 --- [document-generator] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-26T00:00:34.763+01:00  INFO 27844 --- [document-generator] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-26T00:00:34.855+01:00  INFO 27844 --- [document-generator] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-26T00:00:38.245+01:00  INFO 27844 --- [document-generator] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:38.247+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:38.265+01:00  INFO 27844 --- [document-generator] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2026-10-26T00:00:38.298+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 49 ms
+2026-10-26T00:00:38.515+01:00  INFO 27844 --- [document-generator] [           main] c.a.api.DocumentGenerationFlowTest       : Started DocumentGenerationFlowTest in 11.652 seconds (process running for 14.196)
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 15.71 s -- in com.adgendoc.api.DocumentGenerationFlowTest
+[INFO] Running com.adgendoc.api.DocumentRequestControllerTest
+2026-10-26T00:00:41.808+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:41.808+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:41.809+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:41.831+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:41.831+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:41.831+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.113+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.113+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.115+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 2 ms
+2026-10-26T00:00:42.223+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.224+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.225+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.321+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.321+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.321+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.389+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.389+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.389+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.437+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.437+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.437+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.503+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.503+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.503+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.560+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.560+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.560+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.591+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.591+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.591+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.643+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.643+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.643+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.676+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.676+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.682+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.721+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.723+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.723+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.763+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.763+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.764+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.803+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.803+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.803+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.847+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.847+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.848+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.882+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.882+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.882+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:42.912+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.912+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.913+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:42.967+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:42.967+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:42.967+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.003+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.004+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.004+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.045+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.046+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.046+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.065+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=dec192f4-ac44-482b-83ca-5bb8d7e94e5d]
+2026-10-26T00:00:43.099+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.099+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.099+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.141+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.141+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.142+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:43.184+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.184+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.184+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.226+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.226+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.226+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.255+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.255+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.255+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.288+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.288+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.289+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:43.312+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.313+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.313+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.337+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.337+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.337+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.360+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.360+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.360+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.390+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.392+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.392+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.430+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.430+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.430+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.466+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.467+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.467+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.494+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.495+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.495+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.532+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.532+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.532+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.561+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.561+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.561+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.586+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.587+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.588+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.628+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.629+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.629+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.647+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=327c3e91-67d0-43ba-b802-6ed72d60ef9a]
+2026-10-26T00:00:43.673+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.673+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.673+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.709+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.709+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.709+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.749+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.749+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.749+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.769+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.769+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.770+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:43.788+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.788+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.788+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.829+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.831+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.831+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.866+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.866+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.866+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.896+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.896+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.896+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.931+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.931+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.931+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.948+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.948+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.949+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.973+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:43.973+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:43.973+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:43.991+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=b4fe95d8-a0e8-4c20-aa3e-1056eb22eb3a]
+2026-10-26T00:00:44.009+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.009+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.009+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.032+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.032+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.032+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.067+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.069+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.069+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.079+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=7f9a52c1-8653-4c12-b89a-439fe7413c6b]
+2026-10-26T00:00:44.096+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.096+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.097+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.130+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.130+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.130+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.178+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.178+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.179+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.192+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=15b88201-f64e-4ef2-bd0c-55464a5258a6]
+2026-10-26T00:00:44.211+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.211+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.212+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:44.238+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.238+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.238+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.269+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.269+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.269+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.292+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.292+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.293+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:44.315+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.316+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.316+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.345+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.345+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.345+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.378+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.378+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.378+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.395+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.395+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.395+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.420+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.420+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.420+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.436+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.436+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.437+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:44.457+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.457+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.457+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.489+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.489+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.489+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.521+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.521+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.521+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.532+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=cf236f5b-f900-4fb1-a167-9f5f1a37a15e]
+2026-10-26T00:00:44.556+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.556+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.557+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:44.588+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.588+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.588+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.600+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.600+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.600+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.629+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.629+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.630+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:44.653+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.653+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.653+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+[INFO] Tests run: 64, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.900 s -- in com.adgendoc.api.DocumentRequestControllerTest
+[INFO] Running com.adgendoc.api.ExtractionControllerTest
+2026-10-26T00:00:44.723+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.723+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.725+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 2 ms
+2026-10-26T00:00:44.795+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.795+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.795+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.813+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.815+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.815+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.832+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.832+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.832+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.849+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.849+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.849+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.865+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.865+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.865+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.883+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.883+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.883+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.906+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.906+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.906+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.926+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.926+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.927+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:44.943+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.944+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.944+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.961+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.961+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.961+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.979+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.979+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.979+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:44.998+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:44.998+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:44.999+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:45.015+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.015+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.015+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.033+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.033+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.033+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.051+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.051+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.051+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.386 s -- in com.adgendoc.api.ExtractionControllerTest
+[INFO] Running com.adgendoc.api.PhaseEContractVerificationTest
+2026-10-26T00:00:45.080+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.080+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.081+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:45.115+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.116+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.116+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.145+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.145+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.145+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.182+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.183+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.183+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.222+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.222+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.222+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.245+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.245+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.245+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.281+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.281+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.282+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:45.286+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : �chec de g�n�ration [errorCode=DOCUMENT_GENERATION_ERROR, exceptionClass=com.adgendoc.domain.exceptions.DocumentGenerationException, sqlState=n/a, correlationId=d5b2a01d-8e3f-4758-9902-35e575b2b9ef]
+2026-10-26T00:00:45.355+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.356+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.356+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.435+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.436+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.436+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.475+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.475+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.476+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:45.508+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.509+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.509+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.556+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.556+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.556+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.592+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.593+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.594+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:45.629+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.629+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.630+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:45.658+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.659+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.659+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.682+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.682+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.682+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.712+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.712+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.712+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.742+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.742+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.743+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:45.776+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.776+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.776+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.804+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.804+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.804+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.824+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.824+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.824+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.853+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.854+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.854+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.929+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=9a2afec3-b533-4e89-b5f8-a22a8112d458]
+2026-10-26T00:00:45.947+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.947+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.948+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-26T00:00:45.951+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : �chec de g�n�ration [errorCode=DOCUMENT_GENERATION_ERROR, exceptionClass=com.adgendoc.domain.exceptions.DocumentGenerationException, sqlState=n/a, correlationId=38d5b4e5-df39-4d31-88a9-614b4d7adff2]
+2026-10-26T00:00:45.972+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.972+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.972+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.995+01:00  INFO 27844 --- [document-generator] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:45.995+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:45.995+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-26T00:00:45.997+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Erreur interne non g�r�e [errorCode=INTERNAL_ERROR, exceptionClass=java.lang.IllegalStateException, sqlState=n/a, correlationId=0c5cb64d-0c83-4db6-8543-2b8d7e17ccac]
+[INFO] Tests run: 23, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.938 s -- in com.adgendoc.api.PhaseEContractVerificationTest
+[INFO] Running com.adgendoc.api.RequestLoggingSanitizationTest
+2026-10-26T00:00:46.010+01:00  INFO 27844 --- [document-generator] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.adgendoc.api.RequestLoggingSanitizationTest]: RequestLoggingSanitizationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-26T00:00:46.027+01:00  INFO 27844 --- [document-generator] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.adgendoc.DocumentGeneratorApplication for test class com.adgendoc.api.RequestLoggingSanitizationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.3.13)
+
+2026-10-26T00:00:46.146+01:00  INFO 27844 --- [document-generator] [           main] c.a.api.RequestLoggingSanitizationTest   : Starting RequestLoggingSanitizationTest using Java 17.0.10 with PID 27844 (started by epifa in C:\Users\epifa\cursor-workspace\document-generator\backend)
+2026-10-26T00:00:46.146+01:00  INFO 27844 --- [document-generator] [           main] c.a.api.RequestLoggingSanitizationTest   : The following 1 profile is active: "test"
+2026-10-26T00:00:47.909+01:00  INFO 27844 --- [document-generator] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-26T00:00:47.960+01:00  INFO 27844 --- [document-generator] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 51 ms. Found 4 JPA repository interfaces.
+2026-10-26T00:00:48.174+01:00  INFO 27844 --- [document-generator] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-26T00:00:48.179+01:00  INFO 27844 --- [document-generator] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-26T00:00:48.205+01:00  INFO 27844 --- [document-generator] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-26T00:00:48.207+01:00  INFO 27844 --- [document-generator] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-10-26T00:00:48.211+01:00  INFO 27844 --- [document-generator] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-2 - Added connection conn10: url=jdbc:h2:mem:adgendoc_test user=SA
+2026-10-26T00:00:48.211+01:00  INFO 27844 --- [document-generator] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-10-26T00:00:48.367+01:00  INFO 27844 --- [document-generator] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-26T00:00:48.373+01:00  INFO 27844 --- [document-generator] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-26T00:00:48.827+01:00  INFO 27844 --- [document-generator] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-10-26T00:00:48.827+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-26T00:00:48.834+01:00  INFO 27844 --- [document-generator] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2026-10-26T00:00:48.841+01:00  INFO 27844 --- [document-generator] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 14 ms
+2026-10-26T00:00:48.863+01:00  INFO 27844 --- [document-generator] [           main] c.a.api.RequestLoggingSanitizationTest   : Started RequestLoggingSanitizationTest in 2.831 seconds (process running for 24.546)
+2026-10-26T00:00:48.873+01:00  INFO 27844 --- [document-generator] [           main] com.adgendoc.test.logprobe               : probe
+2026-10-26T00:00:48.953+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=0f2902ed-fce6-4974-a721-2ae22e46c5af]
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.957 s -- in com.adgendoc.api.RequestLoggingSanitizationTest
+[INFO] Running com.adgendoc.api.RequestPersistenceFlowTest
+2026-10-26T00:00:48.969+01:00  INFO 27844 --- [document-generator] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.adgendoc.api.RequestPersistenceFlowTest]: RequestPersistenceFlowTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-26T00:00:48.977+01:00  INFO 27844 --- [document-generator] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.adgendoc.DocumentGeneratorApplication for test class com.adgendoc.api.RequestPersistenceFlowTest
+2026-10-26T00:00:49.301+01:00 ERROR 27844 --- [document-generator] [           main] c.adgendoc.api.GlobalExceptionHandler    : Template introuvable [template=ATTESTATION_CONCORDANCE, correlationId=d843ff3e-528b-4189-a1a4-7c4a80e1623d]
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.405 s -- in com.adgendoc.api.RequestPersistenceFlowTest
+[INFO] Running com.adgendoc.application.DocumentGenerationServiceTest
+[INFO] Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.168 s -- in com.adgendoc.application.DocumentGenerationServiceTest
+[INFO] Running com.adgendoc.application.ExtractionSchemaDocCoherenceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.043 s -- in com.adgendoc.application.ExtractionSchemaDocCoherenceTest
+[INFO] Running com.adgendoc.application.ExtractionSchemaValidationTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.197 s -- in com.adgendoc.application.ExtractionSchemaValidationTest
+[INFO] Running com.adgendoc.application.NormalizationServiceTest
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in com.adgendoc.application.NormalizationServiceTest
+[INFO] Running com.adgendoc.application.RequestServiceTest
+[INFO] Tests run: 51, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.087 s -- in com.adgendoc.application.RequestServiceTest
+[INFO] Running com.adgendoc.application.ValidationServiceTest
+[INFO] Tests run: 24, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in com.adgendoc.application.ValidationServiceTest
+[INFO] Running com.adgendoc.domain.RequestStatusTransitionTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.adgendoc.domain.RequestStatusTransitionTest
+[INFO] Running com.adgendoc.infrastructure.config.DatasourceSecretGuardTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in com.adgendoc.infrastructure.config.DatasourceSecretGuardTest
+[INFO] Running com.adgendoc.infrastructure.config.RuntimeSecurityContractTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.098 s -- in com.adgendoc.infrastructure.config.RuntimeSecurityContractTest
+[INFO] Running com.adgendoc.infrastructure.config.SpringContextWiringTest
+2026-10-26T00:00:50.102+01:00  INFO 27844 --- [document-generator] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.adgendoc.infrastructure.config.SpringContextWiringTest]: SpringContextWiringTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-26T00:00:50.140+01:00  INFO 27844 --- [document-generator] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.adgendoc.DocumentGeneratorApplication for test class com.adgendoc.infrastructure.config.SpringContextWiringTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.102 s -- in com.adgendoc.infrastructure.config.SpringContextWiringTest
+[INFO] Running com.adgendoc.infrastructure.docx.PoiTemplateEngineTest
+2026-10-26T00:00:50.950+01:00  WARN 27844 --- [document-generator] [           main] c.a.i.docx.PoiTemplateEngine             : Placeholder non resolu apres fusion : code=FIXTURE
+2026-10-26T00:00:51.047+01:00  WARN 27844 --- [document-generator] [           main] c.a.i.docx.PoiTemplateEngine             : Template absent : code=ATTESTATION_CONCORDANCE
+2026-10-26T00:00:51.057+01:00  WARN 27844 --- [document-generator] [           main] c.a.i.docx.PoiTemplateEngine             : Checksum template invalide : code=ATTESTATION_CONCORDANCE attendu=0000000000000000000000000000000000000000000000000000000000000000
+2026-10-26T00:00:51.062+01:00  WARN 27844 --- [document-generator] [           main] c.a.i.docx.PoiTemplateEngine             : Chemin de template refuse pour le template ATTESTATION_CONCORDANCE
+2026-10-26T00:00:51.181+01:00  WARN 27844 --- [document-generator] [           main] c.a.i.docx.PoiTemplateEngine             : Placeholder non resolu apres fusion : code=FIXTURE
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.981 s -- in com.adgendoc.infrastructure.docx.PoiTemplateEngineTest
+[INFO] Running com.adgendoc.infrastructure.persistence.AuditAdapterTest
+2026-10-26T00:00:51.193+01:00  INFO 27844 --- [document-generator] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.adgendoc.infrastructure.persistence.AuditAdapterTest]: AuditAdapterTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-26T00:00:51.228+01:00  INFO 27844 --- [document-generator] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.adgendoc.DocumentGeneratorApplication for test class com.adgendoc.infrastructure.persistence.AuditAdapterTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.691 s -- in com.adgendoc.infrastructure.persistence.AuditAdapterTest
+[INFO] Running com.adgendoc.infrastructure.storage.FileSystemStorageAdapterTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.151 s -- in com.adgendoc.infrastructure.storage.FileSystemStorageAdapterTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 310, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  42.786 s
+[INFO] Finished at: 2026-10-26T00:00:53+01:00
+[INFO] ------------------------------------------------------------------------
+EXIT=0
