@@ -1,0 +1,98 @@
+LB1 — Test inventory (read-only, post mvn -B test)
+Run reference: exit_code=1, Maven summary Tests run: 298, Failures: 2, Errors: 0, Skipped: 0
+Generated: 2026-10-25 (tester LB1)
+
+=== A. Source test classes (backend/src/test) ===
+
+Motif *Test.java — count 21 — total
+  backend/src/test/java/com/adgendoc/api/DatabaseErrorHandlerTest.java
+  backend/src/test/java/com/adgendoc/api/DatabaseErrorLogSanitizationTest.java
+  backend/src/test/java/com/adgendoc/api/DocumentGenerationFlowTest.java
+  backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
+  backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
+  backend/src/test/java/com/adgendoc/api/PhaseEContractVerificationTest.java
+  backend/src/test/java/com/adgendoc/api/RequestLoggingSanitizationTest.java
+  backend/src/test/java/com/adgendoc/api/RequestPersistenceFlowTest.java
+  backend/src/test/java/com/adgendoc/application/DocumentGenerationServiceTest.java
+  backend/src/test/java/com/adgendoc/application/ExtractionSchemaDocCoherenceTest.java
+  backend/src/test/java/com/adgendoc/application/ExtractionSchemaValidationTest.java
+  backend/src/test/java/com/adgendoc/application/NormalizationServiceTest.java
+  backend/src/test/java/com/adgendoc/application/RequestServiceTest.java
+  backend/src/test/java/com/adgendoc/application/ValidationServiceTest.java
+  backend/src/test/java/com/adgendoc/domain/RequestStatusTransitionTest.java
+  backend/src/test/java/com/adgendoc/infrastructure/config/DatasourceSecretGuardTest.java
+  backend/src/test/java/com/adgendoc/infrastructure/config/RuntimeSecurityContractTest.java
+  backend/src/test/java/com/adgendoc/infrastructure/config/SpringContextWiringTest.java
+  backend/src/test/java/com/adgendoc/infrastructure/docx/PoiTemplateEngineTest.java
+  backend/src/test/java/com/adgendoc/infrastructure/persistence/AuditAdapterTest.java
+  backend/src/test/java/com/adgendoc/infrastructure/storage/FileSystemStorageAdapterTest.java
+
+Motif *Tests.java — count 0
+
+Motif *IT.java — count 2
+  backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
+  backend/src/test/java/com/adgendoc/persistence/PostgresPersistenceIT.java
+
+Motif *ITCase.java — count 0
+
+Motif Test*.java — count 0 (aucun fichier Test*.java hors motif *Test.java ci-dessus)
+
+Motif *TestCase.java — count 0
+
+GRAND TOTAL (motifs Surefire/Failsafe usuels): 23 classes
+
+=== B. backend/pom.xml — Surefire / Failsafe ===
+
+Recherche maven-surefire-plugin / maven-failsafe-plugin dans backend/pom.xml :
+  Aucune déclaration explicite (lignes 84–116 : plugins spring-boot-maven-plugin et maven-resources-plugin uniquement).
+
+Conséquence pour `mvn test` :
+  - Les défauts Apache Maven Surefire 3.x (hérités via spring-boot-starter-parent 3.3.13) s'appliquent.
+  - Includes par défaut Surefire : **/Test*.java, **/*Test.java, **/*Tests.java, **/*TestCase.java
+  - Non exécutés par `mvn test` (défaut Surefire) : **/*IT.java, **/*ITCase.java → phase integration-test via maven-failsafe-plugin sur `mvn verify` (Failsafe non configuré non plus dans ce pom ; comportement parent Boot standard).
+
+Classes *IT / *ITCase du source : HttpVerticalSliceIT, PostgresPersistenceIT — hors scope `mvn test` par convention de nommage.
+
+=== C. backend/target/surefire-reports (après LB1 mvn test) ===
+
+Dossier présent. 22 fichiers TEST-*.xml au total ; 21 mis à jour le 2026-10-25 (run LB1) ; 1 rapport périmé (HttpVerticalSliceIT, LastWriteTime 2026-04-10, non relancé dans ce run — absent des lignes « Running … » du log Maven).
+
+Tableau — rapports LB1 (21 classes, XML date 2026-10-25) :
+
+class                                                            | tests | failures | errors | skipped | time
+com.adgendoc.api.DatabaseErrorHandlerTest                        |     1 |        0 |      0 |       0 | 0.31
+com.adgendoc.api.DatabaseErrorLogSanitizationTest                |     2 |        0 |      0 |       0 | 0.109
+com.adgendoc.api.DocumentGenerationFlowTest                      |     1 |        0 |      0 |       0 | 13.926
+com.adgendoc.api.DocumentRequestControllerTest                   |    52 |        0 |      0 |       0 | 2.314
+com.adgendoc.api.ExtractionControllerTest                        |    16 |        0 |      0 |       0 | 0.355
+com.adgendoc.api.PhaseEContractVerificationTest                  |    23 |        0 |      0 |       0 | 0.853
+com.adgendoc.api.RequestLoggingSanitizationTest                  |     1 |        0 |      0 |       0 | 2.537
+com.adgendoc.api.RequestPersistenceFlowTest                      |    10 |        0 |      0 |       0 | 0.767
+com.adgendoc.application.DocumentGenerationServiceTest           |    20 |        0 |      0 |       0 | 0.285
+com.adgendoc.application.ExtractionSchemaDocCoherenceTest        |     5 |        1 |      0 |       0 | 0.111
+com.adgendoc.application.ExtractionSchemaValidationTest          |    15 |        0 |      0 |       0 | 0.263
+com.adgendoc.application.NormalizationServiceTest                |    18 |        0 |      0 |       0 | 0.034
+com.adgendoc.application.RequestServiceTest                      |    51 |        0 |      0 |       0 | 0.168
+com.adgendoc.application.ValidationServiceTest                   |    24 |        0 |      0 |       0 | 0.028
+com.adgendoc.domain.RequestStatusTransitionTest                  |     5 |        0 |      0 |       0 | 0.007
+com.adgendoc.infrastructure.config.DatasourceSecretGuardTest     |     8 |        0 |      0 |       0 | 0.019
+com.adgendoc.infrastructure.config.RuntimeSecurityContractTest   |    12 |        1 |      0 |       0 | 0.095
+com.adgendoc.infrastructure.config.SpringContextWiringTest       |     6 |        0 |      0 |       0 | 0.2
+com.adgendoc.infrastructure.docx.PoiTemplateEngineTest           |    14 |        0 |      0 |       0 | 1.253
+com.adgendoc.infrastructure.persistence.AuditAdapterTest         |     3 |        0 |      0 |       0 | 0.769
+com.adgendoc.infrastructure.storage.FileSystemStorageAdapterTest |    11 |        0 |      0 |       0 | 0.194
+
+Totaux (21 rapports LB1, alignés résumé Maven) :
+  classes de rapports exécutées ce run : 21
+  tests : 298
+  réussis (tests - failures - errors - skipped) : 296
+  échecs (failures + errors) : 2
+  ignorés (skipped) : 0
+
+Rapport périmé conservé dans le répertoire (non inclus dans les totaux ci-dessus) :
+  com.adgendoc.e2e.HttpVerticalSliceIT — tests=11, failures=0, errors=0, skipped=0, time=6.735 (XML 2026-04-10)
+
+=== D. Classes source sans rapport Surefire frais (non exécutées dans LB1 mvn test) ===
+
+  com.adgendoc.e2e.HttpVerticalSliceIT (*IT — rapport ancien seulement ; pas de « Running » dans LB1-mvn-test.txt)
+  com.adgendoc.persistence.PostgresPersistenceIT (*IT — aucun TEST-*.xml / *.txt)

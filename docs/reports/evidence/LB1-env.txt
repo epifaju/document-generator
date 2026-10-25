@@ -1,0 +1,20 @@
+=== java -version ===
+java version "21.0.10" 2026-01-20 LTS
+Java(TM) SE Runtime Environment (build 21.0.10+8-LTS-217)
+Java HotSpot(TM) 64-Bit Server VM (build 21.0.10+8-LTS-217, mixed mode, sharing)
+exit_code: 0
+
+=== mvn -v ===
+Apache Maven 3.9.10 (5f519b97e944483d878815739f519b2eade0a91d)
+Maven home: C:\Program Files\Apache\maven\apache-maven-3.9.10
+Java version: 17.0.10, vendor: Oracle Corporation, runtime: C:\Program Files\Java\jdk-17
+Default locale: fr_FR, platform encoding: Cp1252
+OS name: "windows 11", version: "10.0", arch: "amd64", family: "windows"
+exit_code: 0
+
+=== git rev-parse HEAD ===
+e3bd43888dcad22124ee0ea1bbae7cdd4b7ca89e
+exit_code: 0
+
+=== git status --short ===
+exit_code: 0

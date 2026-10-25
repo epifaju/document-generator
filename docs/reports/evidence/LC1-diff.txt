@@ -1,0 +1,82 @@
+﻿diff --git a/backend/pom.xml b/backend/pom.xml
+index 760e52b..3cd3058 100644
+--- a/backend/pom.xml
++++ b/backend/pom.xml
+@@ -23,6 +23,8 @@
+         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+         <poi.version>5.2.5</poi.version>
+         <json-schema-validator.version>1.5.9</json-schema-validator.version>
++        <!-- Docker Engine 29.8 parle une API plus récente que Testcontainers 1.19.8 (client 1.32). 1.21.4 négocie cette API ; 1.21.3 reste en 1.32. -->
++        <testcontainers.version>1.21.4</testcontainers.version>
+     </properties>
+ 
+     <dependencies>
+@@ -79,6 +81,21 @@
+             <artifactId>h2</artifactId>
+             <scope>test</scope>
+         </dependency>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-testcontainers</artifactId>
++            <scope>test</scope>
++        </dependency>
++        <dependency>
++            <groupId>org.testcontainers</groupId>
++            <artifactId>junit-jupiter</artifactId>
++            <scope>test</scope>
++        </dependency>
++        <dependency>
++            <groupId>org.testcontainers</groupId>
++            <artifactId>postgresql</artifactId>
++            <scope>test</scope>
++        </dependency>
+     </dependencies>
+ 
+     <build>
+diff --git a/backend/src/test/java/com/adgendoc/persistence/PostgresPersistenceIT.java b/backend/src/test/java/com/adgendoc/persistence/PostgresPersistenceIT.java
+index e95d8ef..d6e8ee5 100644
+--- a/backend/src/test/java/com/adgendoc/persistence/PostgresPersistenceIT.java
++++ b/backend/src/test/java/com/adgendoc/persistence/PostgresPersistenceIT.java
+@@ -11,6 +11,9 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.Test;
+ import org.junit.jupiter.api.io.TempDir;
++import org.testcontainers.containers.PostgreSQLContainer;
++import org.testcontainers.junit.jupiter.Container;
++import org.testcontainers.junit.jupiter.Testcontainers;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+ import org.springframework.boot.test.context.SpringBootTest;
+@@ -48,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+  * Docker requis) :
+  *
+  * <pre>
+- * mvn -o -f backend/pom.xml test -Dtest=PostgresPersistenceIT
++ * mvnw.cmd -B -Pit -Dit.test=PostgresPersistenceIT verify
+  * </pre>
+  *
+  * Preuves attendues : migration {@code V1__init.sql} exécutée (Flyway),
+@@ -58,6 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+  * JSONB / {@code TEXT[]}, verrouillage optimiste, audit sans PII, FK réelles
+  * de V1. Aucun mock sur les couches application/persistance.
+  */
++@Testcontainers
+ @SpringBootTest
+ @AutoConfigureMockMvc
+ class PostgresPersistenceIT {
+@@ -71,9 +75,15 @@ class PostgresPersistenceIT {
+     @TempDir
+     static Path storageRoot;
+ 
++    @Container
++    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
++
+     @DynamicPropertySource
+     static void documentStorageProperties(DynamicPropertyRegistry registry) {
+         registry.add("app.document.storage-path", () -> storageRoot.toString());
++        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
++        registry.add("spring.datasource.username", POSTGRES::getUsername);
++        registry.add("spring.datasource.password", POSTGRES::getPassword);
+     }
+ 
+     @Autowired

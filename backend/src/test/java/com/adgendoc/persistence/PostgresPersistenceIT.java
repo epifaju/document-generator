@@ -11,6 +11,9 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Docker requis) :
  *
  * <pre>
- * mvn -o -f backend/pom.xml test -Dtest=PostgresPersistenceIT
+ * mvnw.cmd -B -Pit -Dit.test=PostgresPersistenceIT verify
  * </pre>
  *
  * Preuves attendues : migration {@code V1__init.sql} exécutée (Flyway),
@@ -58,6 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * JSONB / {@code TEXT[]}, verrouillage optimiste, audit sans PII, FK réelles
  * de V1. Aucun mock sur les couches application/persistance.
  */
+@Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
 class PostgresPersistenceIT {
@@ -71,9 +75,15 @@ class PostgresPersistenceIT {
     @TempDir
     static Path storageRoot;
 
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+
     @DynamicPropertySource
     static void documentStorageProperties(DynamicPropertyRegistry registry) {
         registry.add("app.document.storage-path", () -> storageRoot.toString());
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
     }
 
     @Autowired
