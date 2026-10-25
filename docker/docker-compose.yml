@@ -98,7 +98,7 @@ services:
     # locale reste possible (http://127.0.0.1:5678) sans exposer n8n sur le
     # réseau ; conteneur→conteneur passe par le réseau interne (adgendoc-internal).
     ports:
-      - "127.0.0.1:5681:5678"
+      - "127.0.0.1:5678:5678"
     networks:
       - internal
 

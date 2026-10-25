@@ -582,7 +582,7 @@ Contraintes imposées :
   extraction incomplète est LÉGITIME (S09) : les absences vont dans
   `missingFields` ; la complétude est une règle métier (backend), pas de
   forme (AGENTS.md §4.1) ;
-- `dateNaissance` : `pattern "^\\d{4}-\\d{2}-\\d{2}$"` ;
+- `dateNaissance` : `pattern "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"` ;
 - `missingFields` : `array<string>`, `uniqueItems`, `items` limités aux
   6 clés obligatoires (sous-ensemble exact) ;
 - `description` racine : interdiction d'inventer (« ne jamais inventer ») ;
@@ -620,7 +620,7 @@ Contenu exact à écrire :
         "nom": { "type": "string", "minLength": 1, "maxLength": 100 },
         "dateNaissance": {
           "type": "string",
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
           "description": "Date ISO. 12/05/1985 devient 1985-05-12. Si absente ou ambiguë : la déclarer dans missingFields, ne jamais deviner."
         },
         "lieuNaissance": { "type": "string", "minLength": 1, "maxLength": 200 },

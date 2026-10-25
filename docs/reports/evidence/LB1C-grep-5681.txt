@@ -1,0 +1,107 @@
+command: git grep -n -F "5681"
+when: apres correction de docker/docker-compose.yml (la ligne 101 n'y figure plus)
+pre-fix: docker/docker-compose.yml:101 contenait "127.0.0.1:5681:5678" (git grep avant edition)
+untracked (git grep --untracked -- docs/reports, non inclus ci-dessous): docs/reports/LB1-baseline-backend.md, docs/reports/evidence/LB1-mvn-test.txt
+
+FIX4.2_REPORT.md:7:PORT_5681_MAPPING_CONFIRMED: False
+FIX4.3_REPORT.md:7:PORT_MAPPING_CONFIRMED: True (host 5681 → container 5678)
+FIX4.3_REPORT.md:54:1. DOCKER STATE: Docker Desktop is running (CLI and daemon both available). The n8n test container `adgendoc-n8n-test` is present in `docker ps -a` but its state is **Exited (255)** — it crashed during a previous run. The port mapping is correct (host 5681 → container 5678).
+FIX4.4_REPORT.md:13:N8N_HEALTH: ok (http://127.0.0.1:5681/healthz)
+INDEPENDENT_RUNTIME_AUDIT.md:11:WEBHOOK_REGISTERED_IN_PROCESS: UNKNOWN (protocol rule: "Do not use a reachable port proves webhook registration"; "Empty HTTP body does not prove webhook failure"; connection succeeds on port 5681 but empty body received — direct proof unavailable)
+INDEPENDENT_RUNTIME_AUDIT.md:31:ROOT_CAUSE_CLASSIFICATION: RUNNING_PROCESS_STALE (the n8n runtime process on port 5681 has stale execution state from before the R2 workflow correction; supported by: (1) repository workflow JSON independently verified correct — good regex fragment present (.replace(/[xy]/, function (c) { with comma), bad fragment absent (.replace(/[xy]/function(c) { without comma), no require('crypto')); SHA256 0b2ea1967bb75b2945536e035de081f5f3f98bd9e31aa3abe01849d8b2a6e3a7; (2) running n8n on port 5681 accepts webhook POST but returns empty body (0 bytes), execution errored at InitOrchestration Code node; (3) this matches R2 execution pattern — executions 34/37 errored at InitOrchestration with identical pattern; (4) current runtime attempts (R3) also error at InitOrchestration with same pattern, confirming it is not historical-only. NOT REPOSITORY_DEFECT: repository workflow JSON verified correct. NOT HISTORICAL_EXECUTION_ONLY: current runtime also exhibits the error. NOT INSUFFICIENT_EVIDENCE: direct observable evidence from host supports classification.)
+INDEPENDENT_RUNTIME_AUDIT.md:35:- Running process: port 5681 accepts POST /webhook/document-generation; returns empty body (0 bytes) without HTTP error; execution errored at InitOrchestration; matching pattern with R2 executions 34/37
+R3_FINAL_REPORT.md:9:N8N_CONTAINER_RUNNING: True (port 5681 reachable, webhook POST accepted)
+R3_FINAL_REPORT.md:12:WEBHOOK_REGISTERED: True (port 5681 accepts POST /webhook/document-generation; no connection refused/404)
+R3_FINAL_REPORT.md:37:- Webhook POST to port 5681 completed (execution triggered; no transport error)
+R3_FINAL_REPORT.md:48:WEBHOOK_NOT_REGISTERED: Rejected - Port 5681 accepts the webhook POST (no connection refused or 404 error). The webhook route IS registered.
+R3_FINAL_REPORT.md:50:N8N_RUNTIME_UNAVAILABLE: Rejected - The runtime is technically available (port 5681 responding), but executions error before completing the happy path. This is an execution error, not a runtime availability issue.
+R3_FINAL_REPORT.md:56:S1_WEBHOOK_EXECUTED: True (port 5681 accepted the webhook POST; R2: WEBHOOK_EXECUTED: True)
+R3_FINAL_REPORT.md:107:S1_RESULT: BLOCKED (S1 cannot reach GENERATED because InitOrchestration Code node error blocks downstream execution; matching R2 execution 37 pattern. The workflow definition is correct per R2 and contract §7. Runtime state from before R2 regex fix persists in the running n8n instance on port 5681, causing executions to error at InitOrchestration. No source modifications, imports, or activations performed per R2 trusted state STOP directive.)
+R3_FINAL_REPORT.md:118:- active=true in workflow JSON does not independently prove webhook route registration (R3 confirmed: port 5681 accepts POST but execution errors at InitOrchestration)
+R3_FINAL_REPORT.md:131:[✓] Exactly one S1 webhook occurred (port 5681 accepted POST; execution errored, not transport failure)
+R3_FINAL_REPORT.md:154:S1 webhook initiations: 1 (attempted; port 5681 accepted POST; execution errored, not re-attempted)
+R5_PRERESTART_VERIFICATION.md:15:WEBHOOK_REGISTRATION_EVIDENCE: UNKNOWN (protocol rule: "Empty HTTP body does not prove webhook failure"; "Do not use a reachable port proves webhook registration"; port 5681 accepts POST /webhook/document-generation but returns empty body (0 bytes) without HTTP error — direct proof of route registration in the running process unavailable through read-only host mechanisms)
+R5_PRERESTART_VERIFICATION.md:22:- Cannot directly observe n8n process loading state or verify what workflow is loaded in the running n8n instance on port 5681
+REVIEWER_REPORT.md:35:(S1 retest webhook executed at http://127.0.0.1:5681/webhook/document-generation; returned 200; InitOrchestration node executed; execution 37 captured in runData.)
+S1_REPORT.md:30:  - Webhook: `POST http://127.0.0.1:5681/webhook/document-generation`
+SESSION_FINAL_REPORT.md:131:9. ONE SYNTHETIC WEBHOOK: sent to http://127.0.0.1:5681/webhook/document-generation
+api_tests.ps1:9:$endpoints.Add("http://127.0.0.1:5681/api/v1/workflows")
+api_tests.ps1:10:$endpoints.Add("http://127.0.0.1:5681/api/v1/workflows/1oVzZvEXnWWY3R9F")
+api_tests.ps1:11:$endpoints.Add("http://127.0.0.1:5681/api/v1/executions")
+api_tests.ps1:12:$endpoints.Add("http://127.0.0.1:5681/rest/workflows")
+check_n8n.ps1:4:# Check port 5681 connectivity
+check_n8n.ps1:5:Write-Output "-- Port 5681 connectivity --"
+check_n8n.ps1:10:    $r = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', $p)
+debug2.ps1:8:# Test 1: POST to 5681 webhook - get full error info
+debug2.ps1:9:Write-Output "-- Test 1: POST /webhook/document-generation on port 5681 --"
+debug2.ps1:11:    $result = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', $p)
+debug2.ps1:29:Write-Output "-- Test 2: GET /webhook on port 5681 --"
+debug2.ps1:31:    $result2 = $wc.UploadString('http://127.0.0.1:5681/webhook', $p)
+debug2.ps1:38:Write-Output "-- Test 3: POST root on port 5681 --"
+debug2.ps1:40:    $result3 = $wc.UploadString('http://127.0.0.1:5681/', $p)
+debug2.ps1:47:Write-Output "-- Test 4: Invoke-WebRequest POST on port 5681 --"
+debug2.ps1:49:    $wr = Invoke-WebRequest -Uri 'http://127.0.0.1:5681/webhook/document-generation' -Method Post -Body $p -ContentType 'application/json' -ErrorAction Stop
+debug2.ps1:63:Write-Output "-- Test 5: Invoke-WebRequest GET on port 5681 --"
+debug2.ps1:65:    $wr2 = Invoke-WebRequest -Uri 'http://127.0.0.1:5681/' -Method Get -ErrorAction Stop
+debug3.ps1:27:    "http://127.0.0.1:5681/.ext/n8n/nodes/describe?node=Webhook",
+debug3.ps1:28:    "http://127.0.0.1:5681/n8n/nodes",
+debug3.ps1:29:    "http://127.0.0.1:5681/v1/workflows",
+debug3.ps1:30:    "http://127.0.0.1:5681/api/workflows"
+debug_webhook.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+infra_check.ps1:16:# Port 5681 (webhook)
+infra_check.ps1:17:Write-Output "-- Port 5681 (document-generation webhook) --"
+infra_check.ps1:19:    $r = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', '')
+infra_check2.ps1:21:# Port 5681 (webhook)
+infra_check2.ps1:22:Write-Output "-- Port 5681 (document-generation webhook) --"
+infra_check2.ps1:24:    $r = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', '')
+Binary file n8n/backups/n8n-data-before-loadprompt-fix.tar matches
+phase1_check.ps1:6:    "http://127.0.0.1:5681/.ext/n8n/nodes/describe?node=Webhook",
+phase1_check.ps1:7:    "http://127.0.0.1:5681/n8n/nodes",
+phase1_check.ps1:8:    "http://127.0.0.1:5681/.ext/n8n/workflows/document-generation-v1",
+phase1_check.ps1:9:    "http://127.0.0.1:5681/.ext/n8n/workflows",
+phase1_check.ps1:10:    "http://127.0.0.1:5681/.ext/n8n/executions",
+phase1_check.ps1:11:    "http://127.0.0.1:5681/.ext/n8n/settings",
+phase1_check.ps1:12:    "http://127.0.0.1:5681/.ext/n8n/nodes/node-types",
+phase1_check.ps1:13:    "http://127.0.0.1:5681/.ext/n8n/nodes/describe?node=InitOrchestration"
+phase1_check.ps1:34:    $r = (New-Object System.Net.WebClient).DownloadString('http://127.0.0.1:5681/')
+phase1_check.ps1:42:    $r = (New-Object System.Net.WebClient).DownloadString('http://127.0.0.1:5681/api/v1/info')
+reviewer_verification.md:43:   - Port 5681 accepts POST /webhook/document-generation (connection succeeds)
+reviewer_verification.md:93:[B] Running process IS stale: n8n on port 5681 errors at InitOrchestration with empty body, matching R2 pattern
+reviewer_verification.md:100:- DIFFERENT_WORKFLOW_INSTANCE: Cannot directly verify what workflow is loaded in running n8n on port 5681, but the error pattern matches the repository workflow, making this less likely as primary classification
+reviewer_verification.md:102:- RUNNING_PROCESS_STALE: Supported — the n8n process on port 5681 has stale execution state (errors at InitOrchestration, empty webhook body), while the repository workflow file is correct. The staleness is evidenced by the matching pattern between R2 executions and current runtime attempts.
+reviewer_verification.md:104:VERDICT: RUNNING_PROCESS_STALE — the n8n runtime process on port 5681 has stale execution state from before the R2 workflow correction. The repository workflow file is correct (independently verified), but the running process has not been reloaded with the corrected workflow and continues to error at InitOrchestration Code node.
+run.ps1:4:$r = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', $p)
+run_s1.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+send_webhook.ps1:8:$url = "http://127.0.0.1:5681/webhook/document-generation"
+test_422.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+test_api.ps1:7:    "http://127.0.0.1:5681/.ext/n8n/nodes/describe?node=Webhook",
+test_api.ps1:8:    "http://127.0.0.1:5681/n8n/nodes",
+test_api.ps1:9:    "http://127.0.0.1:5681/health"
+test_import.ps1:4:    $url = "http://127.0.0.1:5681" + $p
+test_invokerequest.ps1:2:$urls = @("http://127.0.0.1:5678/webhook/document-generation", "http://127.0.0.1:5681/webhook/document-generation")
+test_ir.ps1:2:$url = "http://127.0.0.1:5681/webhook/document-generation"
+test_msgs.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+test_urls.ps1:3:    "http://127.0.0.1:5681/",
+test_urls.ps1:4:    "http://127.0.0.1:5681/webhook",
+test_urls.ps1:5:    "http://127.0.0.1:5681/api",
+test_urls2.ps1:3:    "5681_get" = "http://127.0.0.1:5681/";
+test_urls2.ps1:4:    "5681_post_empty" = "http://127.0.0.1:5681/";
+test_urls2.ps1:10:    $wr = Invoke-WebRequest -Uri $urls."5681_get" -Method Get -ErrorAction Stop
+test_urls2.ps1:11:    Write-Output "5681 GET: Status=$($wr.StatusCode) Length=$($wr.Content.Length)"
+test_urls2.ps1:13:    Write-Output "5681 GET: ERROR"
+test_urls2.ps1:19:    $result = $wc.UploadString("http://127.0.0.1:5681/", "")
+test_urls2.ps1:20:    Write-Output "5681 POST empty: Length=$($result.Length)"
+test_urls2.ps1:22:    Write-Output "5681 POST empty: ERROR"
+test_urls2.ps1:28:    $result = $wc.UploadString("http://127.0.0.1:5681/", $payload)
+test_urls2.ps1:29:    Write-Output "5681 POST JSON: Length=$($result.Length)"
+test_urls2.ps1:31:    Write-Output "5681 POST JSON: ERROR"
+test_wc.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+test_webhook.ps1:8:$url = "http://127.0.0.1:5681/webhook/document-generation"
+try_api2.ps1:4:    $r = $wc.DownloadString('http://127.0.0.1:5681/api/workflows')
+try_api2.ps1:13:    $r = $wc.DownloadString('http://127.0.0.1:5681/workflows')
+try_api2.ps1:22:    $r = $wc.DownloadString('http://127.0.0.1:5681/v1/workflows')
+try_import.ps1:5:    'http://127.0.0.1:5681/api/v1/workflows',
+try_import.ps1:6:    'http://127.0.0.1:5681/rest/workflows'
+webhook_test.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+webhook_test2.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+wh5681.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
