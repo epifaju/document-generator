@@ -1,0 +1,12 @@
+Source: mvn -B help:effective-pom (parent spring-boot-starter-parent 3.3.13), lignes de version seulement.
+pluginManagement (pas le build actif) :
+<maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
+<artifactId>maven-failsafe-plugin</artifactId>
+<version>3.2.5</version>
+<maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+<artifactId>maven-surefire-plugin</artifactId>
+<version>3.2.5</version>
+build/plugins actif :
+<artifactId>maven-surefire-plugin</artifactId>
+<version>3.2.5</version>
+maven-failsafe-plugin : absent du build/plugins actif, présent seulement dans pluginManagement.

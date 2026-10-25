@@ -1,0 +1,9 @@
+Commande : mvn -N -B org.apache.maven.plugins:maven-wrapper-plugin:wrapper -Dmaven=3.9.10 -Dtype=only-script
+Plugin résolu : wrapper:3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.10/apache-maven-3.9.10-bin.zip
+Aucun maven-wrapper.jar généré.
+
+11790 backend/mvnw (lf=295 crlf=0)
+8481 backend/mvnw.cmd (lf=0 crlf=189)
+171 backend/.mvn/wrapper/maven-wrapper.properties (lf=0 crlf=3)

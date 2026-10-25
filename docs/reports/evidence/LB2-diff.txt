@@ -1,0 +1,64 @@
+=== git diff -- backend/pom.xml ===
+diff --git a/backend/pom.xml b/backend/pom.xml
+index 1de516b..760e52b 100644
+--- a/backend/pom.xml
++++ b/backend/pom.xml
+@@ -114,4 +114,31 @@
+             </plugin>
+         </plugins>
+     </build>
++
++    <profiles>
++        <profile>
++            <id>it</id>
++            <build>
++                <plugins>
++                    <plugin>
++                        <groupId>org.apache.maven.plugins</groupId>
++                        <artifactId>maven-failsafe-plugin</artifactId>
++                        <configuration>
++                            <includes>
++                                <include>**/*IT.java</include>
++                            </includes>
++                        </configuration>
++                        <executions>
++                            <execution>
++                                <goals>
++                                    <goal>integration-test</goal>
++                                    <goal>verify</goal>
++                                </goals>
++                            </execution>
++                        </executions>
++                    </plugin>
++                </plugins>
++            </build>
++        </profile>
++    </profiles>
+ </project>
+
+=== .gitattributes (non suivi, absent de git diff) ===
+backend/mvnw text eol=lf
+backend/mvnw.cmd text eol=crlf
+
+=== backend/.mvn/wrapper/maven-wrapper.properties (non suivi) ===
+wrapperVersion=3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.10/apache-maven-3.9.10-bin.zip
+
+=== git status --short ===
+ M backend/pom.xml
+?? .gitattributes
+?? backend/.mvn/
+?? backend/mvnw
+?? backend/mvnw.cmd
+?? docs/reports/LB1-baseline-backend.md
+?? docs/reports/evidence/LB1-env.txt
+?? docs/reports/evidence/LB1-mvn-test.txt
+?? docs/reports/evidence/LB1-test-inventory.txt
+?? docs/reports/evidence/LB2-active-profiles.txt
+?? docs/reports/evidence/LB2-mvn-test.txt
+?? docs/reports/evidence/LB2-mvnw-version.txt
+?? docs/reports/evidence/LB2-plugin-versions.txt
+?? docs/reports/evidence/LB2-verify-skipits.txt
+?? docs/reports/evidence/LB2-wrapper-files.txt
+

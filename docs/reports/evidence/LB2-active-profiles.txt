@@ -1,0 +1,50 @@
+=== mvnw.cmd -B -Pit help:active-profiles ===  
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< com.adgendoc:document-generator >-------------------
+[INFO] Building document-generator 1.0.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- help:3.4.1:active-profiles (default-cli) @ document-generator ---
+[INFO] 
+Active Profiles for Project 'com.adgendoc:document-generator:jar:1.0.0-SNAPSHOT':
+
+The following profiles are active:
+
+ - it (source: com.adgendoc:document-generator:1.0.0-SNAPSHOT)
+
+
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  1.760 s
+[INFO] Finished at: 2026-10-25T15:13:12+01:00
+[INFO] ------------------------------------------------------------------------
+exit_code: 0  
+  
+=== mvnw.cmd -B help:active-profiles ===  
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< com.adgendoc:document-generator >-------------------
+[INFO] Building document-generator 1.0.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- help:3.4.1:active-profiles (default-cli) @ document-generator ---
+[INFO] 
+Active Profiles for Project 'com.adgendoc:document-generator:jar:1.0.0-SNAPSHOT':
+
+The following profiles are active:
+
+
+
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  1.646 s
+[INFO] Finished at: 2026-10-25T15:13:16+01:00
+[INFO] ------------------------------------------------------------------------
+exit_code: 0 
