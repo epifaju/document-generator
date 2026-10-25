@@ -59,7 +59,7 @@ Responsabilités (inchangées par rapport à AGENTS.md §2) :
 |---|---|---|---|
 | E1 | `POST` | `/api/v1/requests` | création + validation déterministe (201 / 400 / 422) |
 | E2 | `GET` | `/api/v1/requests/{requestId}` | consultation d'état / polling n8n |
-| E3 | `PATCH` | `/api/v1/requests/{requestId}` | complétion partielle (boucle `422` → utilisateur → merge → re-validation) |
+| E3 | `PATCH` | `/api/v1/requests/{requestId}` | complétion partielle (après un 422 d'E1 ou d'E4 : merge ; si des champs manquent encore, réponse 200 avec status = MISSING_INFORMATION — ADR-002) |
 | E4 | `POST` | `/api/v1/requests/{requestId}/validate` | re-validation idempotente (garde avant génération, reprise `FAILED`) |
 | E5 | `POST` | `/api/v1/requests/{requestId}/generate` | fusion template → DOCX (201 / 409 / 500) |
 | E6 | `GET` | `/api/v1/requests/{requestId}/documents/{documentId}` | téléchargement binaire DOCX |
@@ -130,6 +130,8 @@ backend ; en it.2, unique endpoint non protégé.
 | ADR-12 | Génération | **Synchrone, `201`** pour `POST .../generate` | OQ-API-2 : `202` + polling reporté it.2 |
 | ADR-13 | Santé du service | `GET /api/v1/health` maison (délègue à la santé DataSource) → `{"status":"UP"|"DOWN"}` ; `/actuator/health` aussi exposé | E7 du contrat + healthcheck Docker ; OQ-API-3 : les deux en it.1, arbitrage security en fin d'itération |
 | ADR-14 | Horloge | Bean `java.time.Clock` UTC (`ZoneOffset.UTC`), injecté dans `ValidationService` | dates (N3, `ERR_DATE_FUTUR`) testées de façon déterministe (S05) |
+
+**Addendum ADR-09 (2026-10-25).** Testcontainers est autorisé dans le profil Maven `it` uniquement, en version 1.21.4, imposée par la compatibilité avec Docker 29. Le build par défaut (`mvn test`, sans le profil `it`) reste sans Docker. La décision d'origine de la ligne ADR-09 n'est pas réécrite.
 
 ---
 
@@ -435,10 +437,11 @@ controller (api) → service (application) → port (domain) → adapter (infras
   `["prenom", "nom", "dateNaissance", "lieuNaissance", "nomIncorrect", "nomCorrect"]`
 - Après normalisation, un champ vide/null/espaces ⇒ **absent** (N9) ;
 - `missingFields` = sous-ensemble de cette liste **dans l'ordre canonique**
-  (jamais l'ordre de réception) ; identique dans la réponse 422, la colonne
+  (jamais l'ordre de réception) ; identique dans la réponse qui porte
+  `missingFields` (422 d'E1 et d'E4, 200 d'E3 — ADR-002), la colonne
   `document_request.missing_fields` et la question posée par n8n ;
 - Dès qu'au moins 1 champ obligatoire est absent ⇒
-  `status = MISSING_INFORMATION` (422) et **la validation s'arrête là** :
+  `status = MISSING_INFORMATION` (HTTP 422 sur E1 et E4 ; HTTP 200 sur E3 — ADR-002) et **la validation s'arrête là** :
   aucun `fieldErrors` n'est produit (phase de présence avant phase de format).
 
 ### 5.4 Pipeline déterministe — TOUJOURS normaliser avant valider
@@ -448,7 +451,7 @@ entrée (DTO)
   → V1 enveloppe   : JSON bon, documentType supporté        [400 non persisté si échec]
   → V2 clés        : aucune inconnue, aucune réservée       [400 persisté REJECTED si échec]
   → N  NORMALISATION N1–N9 (NormalizationService)           [TOUJOURS exécutée]
-  → V3 présence    : 6 obligatoires après normalisation     [422 MISSING_INFORMATION]
+  → V3 présence    : 6 obligatoires après normalisation     [422 sur E1 et E4 ; 200 sur E3 — ADR-002]
   → V4 format      : motifs, longueurs, dates, enums, email, téléphone
                                                        [400 persisté REJECTED]
   → V5 cohérence   : nomIncorrect ≠ nomCorrect (comparaison minuscules,
@@ -463,8 +466,8 @@ Règles complémentaires :
 - `confidence` de l'extraction : **métadonnée d'audit uniquement** —
   n'influence jamais `ValidationService` (AGENTS.md §12) ;
 - persistance (contrat §1.4) : 400 enveloppe = **non persisté** ;
-  400 métier = persisté `REJECTED` avec `requestId` ; 422 = persisté
-  `MISSING_INFORMATION` avec `requestId` ; 201 = persisté `VALIDATED` ;
+  400 métier = persisté `REJECTED` avec `requestId` ; 422 (E1, E4) = persisté
+  `MISSING_INFORMATION` avec `requestId` ; E3 persiste le même statut avec HTTP 200 (ADR-002) ; 201 = persisté `VALIDATED` ;
 - `PATCH` (E3) recalcule toujours le statut final **sans jamais passer par
   `DRAFT`** ; merge strict : seuls les champs fournis sont écrasés.
 
@@ -1302,7 +1305,7 @@ avec `tester`)
 |---|---|---|---|
 | **OQ-1** | **Wording officiel de l'attestation inconnu** (libellé, autorité émettrice, mentions obligatoires) — `REQUIRES_BUSINESS_VALIDATION` | Template non approuvé ; bloquant avant toute mise en production, **pas** avant le dev des fondations | Template placeholder technique marqué NON APPROUVÉ (fichier 59) ; escalade humaine obligatoire avant revue finale (AGENTS.md §18) |
 | R-01 | DDL `JSONB`/`TEXT[]` non mappés correctement → échec `ddl-auto: validate` | Démarrage backend | `@JdbcTypeCode(SqlTypes.JSON/ARRAY)` imposés (§3.1) ; vérif Docker obligatoire Phase L |
-| R-02 | Aucun test de migration dans `mvn test` (pas de Docker, ADR-09) | DDL cassé non détecté par CI unitaire | Vérification Docker Phase L ; Testcontainers/`@SpringBootTest` reportés it.2 |
+| R-02 | Aucun test de migration dans `mvn test` (pas de Docker, ADR-09) | DDL cassé non détecté par CI unitaire | Profil Maven `it` : Testcontainers 1.21.4 (addendum ADR-09, 2026-10-25). Le build par défaut reste sans Docker. |
 | R-03 | POI : tokens `{{...}}` scindés sur plusieurs `XWPFRun` → remplacement partiel | DOCX avec placeholders résiduels | Algorithme §6.2.3 (reconstruction paragraphe) ; `DocumentGenerationServiceTest` + test de non-résidu sur le template généré |
 | R-04 | Checksum `V2` désaligné du fichier template (template modifié après seed, ou ancienne V2 placeholder 64×`0`) | Génération → `TEMPLATE_NOT_FOUND` (safe) ou échec Flyway validation en amorçage | **Résiduel** : checksum réel `e98a91…9ebc29` seedé (Phase G) ; mismatch ⇒ refus déterministe §6.2 ; base dev ayant l'ancienne V2 ⇒ recréer ou `flyway repair` manuel contrôlé (jamais automatique) |
 | R-05 | Chemin Flyway relatif au working directory (`../database/migrations`) | Flyway ne trouve pas les migrations selon le lancement | `MIGRATIONS_DIR` surchargeable ; Docker = `/app/migrations` (§10.1) ; noté dans `application.yml` |

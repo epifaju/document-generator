@@ -311,7 +311,7 @@ Codes de champ à préserver : `ERR_PAYLOAD_INVALIDE`, `ERR_DOCUMENT_TYPE_NON_SU
 | ID | Constat | Source | Proposition |
 |---|---|---|---|
 | Q-01 | **RÉSOLUE** — décision humaine, 2026-10-24. `REJECTED` via E3 = HTTP `400` (`ErrorResponse`, `VALIDATION_ERROR`, statut `REJECTED` persisté). | API §3.3 ; N8N §5 | `docs/adr/ADR-001-e3-regle-metier-400.md` |
-| Q-02 | E3 renvoie **200** `MISSING_INFORMATION` quand il reste des champs absents, alors que E1/E4 renvoient **422**. | API §3.3 vs §3.1/3.4 | Documenter explicitement comme choix voulu (la complétion est une conversation) ou aligner |
+| Q-02 | **RÉSOLUE** — décision humaine, 2026-10-25. E3 renvoie **200** avec `status = MISSING_INFORMATION` quand il reste des champs absents. E1 et E4 conservent **422**. | API §3.3 vs §3.1/3.4 | `docs/adr/ADR-002-e3-missing-information-200.md` |
 | Q-03 | `ErrorResponse.correlationId` typé **UUID**, mais n8n accepte `^[A-Za-z0-9-]{8,64}$` et le filtre backend `^[A-Za-z0-9-]{1,64}$`. | API §2.3 vs N8N §1.1 | Typer `string` (pattern commun) |
 | Q-04 | **`REJECTED` terminal** : une simple faute de date dans `data` fige la demande ; le round suivant impose une **nouvelle** demande (2ᵉ ligne avec la même PII, finding `F-I-4`). | API §1.4, §3.3 ; N8N §5 | Décision produit : autoriser la correction depuis `REJECTED` (E3) ou assumer la duplication et fixer la rétention |
 | Q-05 | **Aucun compteur de rounds côté backend** : `MAX_CLARIFICATION_ROUNDS=5` repose sur les *static data* n8n (effectif seulement en webhook de production). | N8N §4, §9 | `[DÉCISION]` it.2 : champ additif `clarificationRounds` dans `RequestStatusResponse` |

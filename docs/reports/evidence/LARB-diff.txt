@@ -1,0 +1,193 @@
+diff --git a/docs/PRD_adgendoc_v2_1_Cursor.md b/docs/PRD_adgendoc_v2_1_Cursor.md
+index 0add902..abddfcc 100644
+--- a/docs/PRD_adgendoc_v2_1_Cursor.md
++++ b/docs/PRD_adgendoc_v2_1_Cursor.md
+@@ -311,7 +311,7 @@ Codes de champ à préserver : `ERR_PAYLOAD_INVALIDE`, `ERR_DOCUMENT_TYPE_NON_SU
+ | ID | Constat | Source | Proposition |
+ |---|---|---|---|
+ | Q-01 | **RÉSOLUE** — décision humaine, 2026-10-24. `REJECTED` via E3 = HTTP `400` (`ErrorResponse`, `VALIDATION_ERROR`, statut `REJECTED` persisté). | API §3.3 ; N8N §5 | `docs/adr/ADR-001-e3-regle-metier-400.md` |
+-| Q-02 | E3 renvoie **200** `MISSING_INFORMATION` quand il reste des champs absents, alors que E1/E4 renvoient **422**. | API §3.3 vs §3.1/3.4 | Documenter explicitement comme choix voulu (la complétion est une conversation) ou aligner |
++| Q-02 | **RÉSOLUE** — décision humaine, 2026-10-25. E3 renvoie **200** avec `status = MISSING_INFORMATION` quand il reste des champs absents. E1 et E4 conservent **422**. | API §3.3 vs §3.1/3.4 | `docs/adr/ADR-002-e3-missing-information-200.md` |
+ | Q-03 | `ErrorResponse.correlationId` typé **UUID**, mais n8n accepte `^[A-Za-z0-9-]{8,64}$` et le filtre backend `^[A-Za-z0-9-]{1,64}$`. | API §2.3 vs N8N §1.1 | Typer `string` (pattern commun) |
+ | Q-04 | **`REJECTED` terminal** : une simple faute de date dans `data` fige la demande ; le round suivant impose une **nouvelle** demande (2ᵉ ligne avec la même PII, finding `F-I-4`). | API §1.4, §3.3 ; N8N §5 | Décision produit : autoriser la correction depuis `REJECTED` (E3) ou assumer la duplication et fixer la rétention |
+ | Q-05 | **Aucun compteur de rounds côté backend** : `MAX_CLARIFICATION_ROUNDS=5` repose sur les *static data* n8n (effectif seulement en webhook de production). | N8N §4, §9 | `[DÉCISION]` it.2 : champ additif `clarificationRounds` dans `RequestStatusResponse` |
+diff --git a/docs/adr/ADR-002-e3-missing-information-200.md b/docs/adr/ADR-002-e3-missing-information-200.md
+index c694744..7dd03df 100644
+--- a/docs/adr/ADR-002-e3-missing-information-200.md
++++ b/docs/adr/ADR-002-e3-missing-information-200.md
+@@ -3,7 +3,7 @@
+ | | |
+ |---|---|
+ | Question | Q-02 |
+-| Statut | **PROPOSÉ** |
++| Statut | **ACCEPTÉ** |
+ | Date | 2026-10-24 |
+ | Périmètre | Itération 1 — documentation. Aucun code, contrat ou test modifié par ce fichier. |
+ | Hors numérotation | Ne remplace pas le tableau ADR-01…ADR-14 de `docs/architecture.md:117-132`. |
+@@ -44,4 +44,4 @@ Option 1. La complétion conversationnelle (E3) et la validation ponctuelle (E1,
+ 
+ Lot : L0c, mention documentaire seulement. Pas de lot de code.
+ 
+-Statut de cet ADR : **PROPOSÉ**. L'arbitrage reste humain.
++Statut de cet ADR : **ACCEPTÉ** (2026-10-25). Option 1 retenue : E3 renvoie `200` avec `status = MISSING_INFORMATION`. E1 et E4 conservent `422`.
+diff --git a/docs/architecture.md b/docs/architecture.md
+index d192fd7..09600ab 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -59,7 +59,7 @@ Responsabilités (inchangées par rapport à AGENTS.md §2) :
+ |---|---|---|---|
+ | E1 | `POST` | `/api/v1/requests` | création + validation déterministe (201 / 400 / 422) |
+ | E2 | `GET` | `/api/v1/requests/{requestId}` | consultation d'état / polling n8n |
+-| E3 | `PATCH` | `/api/v1/requests/{requestId}` | complétion partielle (boucle `422` → utilisateur → merge → re-validation) |
++| E3 | `PATCH` | `/api/v1/requests/{requestId}` | complétion partielle (après un 422 d'E1 ou d'E4 : merge ; si des champs manquent encore, réponse 200 avec status = MISSING_INFORMATION — ADR-002) |
+ | E4 | `POST` | `/api/v1/requests/{requestId}/validate` | re-validation idempotente (garde avant génération, reprise `FAILED`) |
+ | E5 | `POST` | `/api/v1/requests/{requestId}/generate` | fusion template → DOCX (201 / 409 / 500) |
+ | E6 | `GET` | `/api/v1/requests/{requestId}/documents/{documentId}` | téléchargement binaire DOCX |
+@@ -131,6 +131,8 @@ backend ; en it.2, unique endpoint non protégé.
+ | ADR-13 | Santé du service | `GET /api/v1/health` maison (délègue à la santé DataSource) → `{"status":"UP"|"DOWN"}` ; `/actuator/health` aussi exposé | E7 du contrat + healthcheck Docker ; OQ-API-3 : les deux en it.1, arbitrage security en fin d'itération |
+ | ADR-14 | Horloge | Bean `java.time.Clock` UTC (`ZoneOffset.UTC`), injecté dans `ValidationService` | dates (N3, `ERR_DATE_FUTUR`) testées de façon déterministe (S05) |
+ 
++**Addendum ADR-09 (2026-10-25).** Testcontainers est autorisé dans le profil Maven `it` uniquement, en version 1.21.4, imposée par la compatibilité avec Docker 29. Le build par défaut (`mvn test`, sans le profil `it`) reste sans Docker. La décision d'origine de la ligne ADR-09 n'est pas réécrite.
++
+ ---
+ 
+ ## 3. DDL SQL — `database/migrations/`
+@@ -435,10 +437,11 @@ controller (api) → service (application) → port (domain) → adapter (infras
+   `["prenom", "nom", "dateNaissance", "lieuNaissance", "nomIncorrect", "nomCorrect"]`
+ - Après normalisation, un champ vide/null/espaces ⇒ **absent** (N9) ;
+ - `missingFields` = sous-ensemble de cette liste **dans l'ordre canonique**
+-  (jamais l'ordre de réception) ; identique dans la réponse 422, la colonne
++  (jamais l'ordre de réception) ; identique dans la réponse qui porte
++  `missingFields` (422 d'E1 et d'E4, 200 d'E3 — ADR-002), la colonne
+   `document_request.missing_fields` et la question posée par n8n ;
+ - Dès qu'au moins 1 champ obligatoire est absent ⇒
+-  `status = MISSING_INFORMATION` (422) et **la validation s'arrête là** :
++  `status = MISSING_INFORMATION` (HTTP 422 sur E1 et E4 ; HTTP 200 sur E3 — ADR-002) et **la validation s'arrête là** :
+   aucun `fieldErrors` n'est produit (phase de présence avant phase de format).
+ 
+ ### 5.4 Pipeline déterministe — TOUJOURS normaliser avant valider
+@@ -448,7 +451,7 @@ entrée (DTO)
+   → V1 enveloppe   : JSON bon, documentType supporté        [400 non persisté si échec]
+   → V2 clés        : aucune inconnue, aucune réservée       [400 persisté REJECTED si échec]
+   → N  NORMALISATION N1–N9 (NormalizationService)           [TOUJOURS exécutée]
+-  → V3 présence    : 6 obligatoires après normalisation     [422 MISSING_INFORMATION]
++  → V3 présence    : 6 obligatoires après normalisation     [422 sur E1 et E4 ; 200 sur E3 — ADR-002]
+   → V4 format      : motifs, longueurs, dates, enums, email, téléphone
+                                                        [400 persisté REJECTED]
+   → V5 cohérence   : nomIncorrect ≠ nomCorrect (comparaison minuscules,
+@@ -463,8 +466,8 @@ Règles complémentaires :
+ - `confidence` de l'extraction : **métadonnée d'audit uniquement** —
+   n'influence jamais `ValidationService` (AGENTS.md §12) ;
+ - persistance (contrat §1.4) : 400 enveloppe = **non persisté** ;
+-  400 métier = persisté `REJECTED` avec `requestId` ; 422 = persisté
+-  `MISSING_INFORMATION` avec `requestId` ; 201 = persisté `VALIDATED` ;
++  400 métier = persisté `REJECTED` avec `requestId` ; 422 (E1, E4) = persisté
++  `MISSING_INFORMATION` avec `requestId` ; E3 persiste le même statut avec HTTP 200 (ADR-002) ; 201 = persisté `VALIDATED` ;
+ - `PATCH` (E3) recalcule toujours le statut final **sans jamais passer par
+   `DRAFT`** ; merge strict : seuls les champs fournis sont écrasés.
+ 
+@@ -1302,7 +1305,7 @@ avec `tester`)
+ |---|---|---|---|
+ | **OQ-1** | **Wording officiel de l'attestation inconnu** (libellé, autorité émettrice, mentions obligatoires) — `REQUIRES_BUSINESS_VALIDATION` | Template non approuvé ; bloquant avant toute mise en production, **pas** avant le dev des fondations | Template placeholder technique marqué NON APPROUVÉ (fichier 59) ; escalade humaine obligatoire avant revue finale (AGENTS.md §18) |
+ | R-01 | DDL `JSONB`/`TEXT[]` non mappés correctement → échec `ddl-auto: validate` | Démarrage backend | `@JdbcTypeCode(SqlTypes.JSON/ARRAY)` imposés (§3.1) ; vérif Docker obligatoire Phase L |
+-| R-02 | Aucun test de migration dans `mvn test` (pas de Docker, ADR-09) | DDL cassé non détecté par CI unitaire | Vérification Docker Phase L ; Testcontainers/`@SpringBootTest` reportés it.2 |
++| R-02 | Aucun test de migration dans `mvn test` (pas de Docker, ADR-09) | DDL cassé non détecté par CI unitaire | Profil Maven `it` : Testcontainers 1.21.4 (addendum ADR-09, 2026-10-25). Le build par défaut reste sans Docker. |
+ | R-03 | POI : tokens `{{...}}` scindés sur plusieurs `XWPFRun` → remplacement partiel | DOCX avec placeholders résiduels | Algorithme §6.2.3 (reconstruction paragraphe) ; `DocumentGenerationServiceTest` + test de non-résidu sur le template généré |
+ | R-04 | Checksum `V2` désaligné du fichier template (template modifié après seed, ou ancienne V2 placeholder 64×`0`) | Génération → `TEMPLATE_NOT_FOUND` (safe) ou échec Flyway validation en amorçage | **Résiduel** : checksum réel `e98a91…9ebc29` seedé (Phase G) ; mismatch ⇒ refus déterministe §6.2 ; base dev ayant l'ancienne V2 ⇒ recréer ou `flyway repair` manuel contrôlé (jamais automatique) |
+ | R-05 | Chemin Flyway relatif au working directory (`../database/migrations`) | Flyway ne trouve pas les migrations selon le lancement | `MIGRATIONS_DIR` surchargeable ; Docker = `/app/migrations` (§10.1) ; noté dans `application.yml` |
+diff --git a/requirements/API_CONTRACTS.md b/requirements/API_CONTRACTS.md
+index 2ab5f16..3628884 100644
+--- a/requirements/API_CONTRACTS.md
++++ b/requirements/API_CONTRACTS.md
+@@ -307,6 +307,7 @@ Consultation d'état (polling n8n, affichage conversationnel).
+ |---|---|---|
+ | `200 OK` | `RequestStatusResponse` (§2.2) | Demande existante |
+ | `404 Not Found` | `ErrorResponse` (`code = REQUEST_NOT_FOUND`) | `requestId` inconnu / inexistant |
++| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `requestId` qui n'est pas un UUID v4 — requête non traitée, rien de persisté |
+ | `500` | `ErrorResponse` | Erreur technique |
+ 
+ ---
+@@ -342,6 +343,7 @@ champs présents dans le corps sont modifiés.
+ |---|---|---|
+ | `200 OK` | `RequestStatusResponse` (statut recalculé) | Statut **net** recalculé après fusion : `MISSING_INFORMATION` → `VALIDATED` si les 6 champs obligatoires sont désormais tous présents et toutes les règles passent (T5) ; `MISSING_INFORMATION` conservé sinon (T6b) ; `VALIDATED` conservé (T11) ou rétrogradé (`MISSING_INFORMATION` T7) ; `FAILED` repris (T12 / T12c) |
+ | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée, `document_request` non modifié, `fieldErrors[0].field = Content-Type`, `fieldErrors[0].code = ERR_PAYLOAD_INVALIDE` |
++| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | JSON malformé — `document_request` non modifié, `fieldErrors[0].field = payload`, `fieldErrors[0].code = ERR_PAYLOAD_INVALIDE`. Le même sous-code distingue ce rejet du rejet d'en-tête (`field = Content-Type`, ADR-015). |
+ | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[].code = ERR_CHAMP_INCONNU` \| `ERR_CHAMP_RESERVE`) | **Clé inconnue ou réservée = erreur structurelle de requête** (arbitrage humain F-03) : `document_request` **non modifié**, **jamais** passé à `REJECTED`, aucune mutation métier persistée (un événement d'audit technique sans PII reste possible) |
+ | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[]`) | Règle métier violée par les données fusionnées → `status = REJECTED` (persistée, transitions T4 / T6 / T10 / T12b) |
+ | `404 Not Found` | `ErrorResponse` (`code = REQUEST_NOT_FOUND`) | Demande inconnue |
+@@ -407,7 +409,7 @@ Téléchargement (autorisé) du document généré.
+ | Code | Corps | Headers de réponse | Condition |
+ |---|---|---|---|
+ | `200 OK` | binaire DOCX (octets) | `Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document` · `Content-Disposition: attachment; filename="attestation-concordance-<requestId>.docx"` | Document existant et appartenant à la demande |
+-| `404 Not Found` | `ErrorResponse` (`code = DOCUMENT_NOT_FOUND` \| `REQUEST_NOT_FOUND`) | JSON | `documentId` ou `requestId` inconnu, ou document d'une autre demande |
++| `404 Not Found` | `ErrorResponse` (`code = DOCUMENT_NOT_FOUND`) | JSON | `requestId` inconnu, `documentId` inconnu, ou document d'une autre demande |
+ | `401` (itération 2) | `ErrorResponse` (`code = UNAUTHORIZED`) | JSON | Token absent/expiré |
+ | `500` | `ErrorResponse` (`code = INTERNAL_ERROR`) | JSON | Erreur de lecture du stockage |
+ 
+@@ -455,10 +457,11 @@ vérité).
+ 
+ | HTTP | `code` (ErrorResponse) | Utilisé par |
+ |---|---|---|
+-| `400` | `VALIDATION_ERROR` (sous-codes `ERR_*` du pilote §10.2) | `POST /requests`, `PATCH /requests/{id}`, `POST /validate` ; `POST /extraction/validate` uniquement pour le rejet de `Content-Type` (§1.1). Le `400` de schéma E8 est un `ExtractionValidationResponse`, hors cette ligne |
++| `400` | `VALIDATION_ERROR` (sous-codes `ERR_*` du pilote §10.2) | `POST /requests`, `PATCH /requests/{id}`, `POST /validate` ; `POST /extraction/validate` uniquement pour le rejet de `Content-Type` (§1.1). Le `400` de schéma E8 est un `ExtractionValidationResponse`, hors cette ligne. `GET /requests/{id}` lorsque le chemin n'est pas un UUID v4 (rien de persisté) |
+ | `401` | `UNAUTHORIZED` | tous (sauf health) — **itération 2** |
+ | `403` | `FORBIDDEN` | accès à une demande d'un tiers — **itération 2** |
+-| `404` | `REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` | `GET /requests/{id}`, `GET .../documents/{id}`, `POST /validate`, `POST /generate` |
++| `404` | `REQUEST_NOT_FOUND` | `GET /requests/{id}` (UUID v4 valide, demande absente), `POST /validate`, `POST /generate` |
++| `404` | `DOCUMENT_NOT_FOUND` | `GET .../documents/{id}` — demande inconnue, document inconnu, ou document d'une autre demande |
+ | `409` | `INVALID_STATUS` \| `REQUEST_ALREADY_CLOSED` | `POST /validate`, `POST /generate` (`INVALID_STATUS`) ; `PATCH /requests/{id}` (`REQUEST_ALREADY_CLOSED` : demande close) |
+ | `422` | `MISSING_INFORMATION` (+ `missingFields[]`) | `POST /requests`, `POST /validate` |
+ | `500` | `TEMPLATE_NOT_FOUND` / `DOCUMENT_GENERATION_ERROR` / `DATABASE_ERROR` / `INTERNAL_ERROR` | `POST /generate` et endpoints généraux |
+diff --git a/requirements/ATTESTATION_CONCORDANCE.md b/requirements/ATTESTATION_CONCORDANCE.md
+index 5772359..8431b88 100644
+--- a/requirements/ATTESTATION_CONCORDANCE.md
++++ b/requirements/ATTESTATION_CONCORDANCE.md
+@@ -167,7 +167,7 @@ l'évaluation) :
+    (`referenceDemande`).
+ 3. **V normalisation** — règles du §7 appliquées.
+ 4. **V présence** — les 6 champs obligatoires ne sont pas absents
+-   (vide/null/espaces ⇒ absent) → sinon `MISSING_INFORMATION` (422).
++   (vide/null/espaces ⇒ absent) → sinon `MISSING_INFORMATION` (HTTP 422 sur POST /requests et POST .../validate ; HTTP 200 avec status = MISSING_INFORMATION sur le PATCH — ADR-002).
+ 5. **V format** — motifs, longueurs, dates, enums, e-mail, téléphone.
+ 6. **V cohérence inter-champs** — `nomIncorrect ≠ nomCorrect`
+    (comparaison après normalisation, insensible à la casse et aux espaces).
+@@ -400,8 +400,10 @@ l'invariant `allOf` de `N8N_CONTRACTS.md` §5 **entendu payload-scoped**
+ E8 rejetterait un round partiel pourtant correct → `502`). Le recalcul
+ **fusionné payload + état** est **l'exclusivité du backend après merge**
+ (V4 + N9) : lui seul décide `status`. Si ce recalcul constate ≥ 1 champ
+-obligatoire absent ⇒ `status = MISSING_INFORMATION`, HTTP **422**, code
+-**existant** `ERR_CHAMP_OBLIGATOIRE_ABSENT` (§10.1) — **aucun code
++obligatoire absent ⇒ `status = MISSING_INFORMATION`. Sur le PATCH (E3),
++la réponse est HTTP **200** avec ce statut (ADR-002). Le HTTP **422**
++reste celui de `POST /requests` et de `POST .../validate`. Code métier
++existant `ERR_CHAMP_OBLIGATOIRE_ABSENT` (§10.1) — **aucun code
+ d'erreur API ajouté** (décision 9). La question posée à l'utilisateur
+ cible **uniquement** les clés de `missingFields` : dans S17, **une seule
+ question explicite d'identité**, **pas** de re-demande corrective des
+@@ -594,7 +596,7 @@ Transitions **interdites** (→ `409 INVALID_STATUS` ou
+ 
+ ## 10. CODES D'ERREUR MÉTIER (BUSINESS_ERRORS)
+ 
+-### 10.1 Famille `MISSING_INFORMATION` — HTTP 422
++### 10.1 Famille `MISSING_INFORMATION` — HTTP 422 (E1, E4) ; HTTP 200 sur E3 (ADR-002)
+ 
+ | Code | Champs en erreur | Message FR |
+ |---|---|---|
+@@ -622,7 +624,7 @@ Transitions **interdites** (→ `409 INVALID_STATUS` ou
+ 
+ `INVALID_STATUS` (409) · `REQUEST_ALREADY_CLOSED` (409 : demande `GENERATED`
+ ou `REJECTED` — rejet d'un `PATCH`) ·
+-`REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` (404) ·
++`REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` (404 ; sur E6, le seul code est `DOCUMENT_NOT_FOUND`) ·
+ `TEMPLATE_NOT_FOUND` (500) · `DOCUMENT_GENERATION_ERROR` (500) ·
+ `DATABASE_ERROR` (500) · `INTERNAL_ERROR` (500) · `UNAUTHORIZED` (401) ·
+ `FORBIDDEN` (403) — les deux derniers en itération 2 ·
+@@ -653,7 +655,7 @@ Voir `requirements/API_CONTRACTS.md` pour le mapping HTTP ↔ codes.
+ | S14 | Génération happy path | `status=VALIDATED`, template DOCX présent | `POST /api/v1/requests/{id}/generate` | `201` ; `documentId` présent ; `status=GENERATED` ; puis `GET .../documents/{documentId}` → `200` binaire DOCX, `Content-Disposition: attachment` |
+ | S15 | Template manquant | `status=VALIDATED` mais template introuvable sur disque | `POST /api/v1/requests/{id}/generate` | `500` ; `code=TEMPLATE_NOT_FOUND` ; `status=FAILED` ; reprise : `POST .../validate` → `200 VALIDATED` puis re-`generate` |
+ | S16 | Consultation état inconnu | `requestId` inexistant | `GET /api/v1/requests/{requestId}` | `404` ; `code=REQUEST_NOT_FOUND` ; aucun détail technique fuité |
+-| S17 | Attribution erronée d'identité depuis un segment concordance (exécution 86, valeurs fictives) | **Round 2** (`requestId` connu) ; état persisté avant le round : `MISSING_INFORMATION` avec `dateNaissance=1993-04-17` et `lieuNaissance=Nova Cidade`, **sans** `prenom`/`nom`/`nomIncorrect`/`nomCorrect` et sans déclaration d'identité antérieure ; message utilisateur : « …je suis né(e) le 17/04/1993 à Nova Cidade. Le nom figurant à l'état civil est incorrect : Pedro Miguel Santos ; le nom correct est Pedro Miguel Santhos. » ; **extraction défaillante constatée** (qwen2.5:1.5b) : `prenom=Pedro`, `nom=Miguel`, `dateNaissance=1993-04-17`, `lieuNaissance=Nova Cidade`, `nomIncorrect`/`nomCorrect` absents → **outcome constaté** `422` `MISSING_INFORMATION` `missingFields=[nomIncorrect, nomCorrect]` | round 2 : extraction → **D-1 (§6.1.3)** → E8 → E3 PATCH partiel | **Attendu avec A-1 + A-5 + D-1** : l'extraction remplit `nomIncorrect=Pedro Miguel Santos`, `nomCorrect=Pedro Miguel Santhos` (formes complètes) ; identité **non déclarée explicitement** (aucun ID-1/ID-2) ⇒ `prenom`/`nom` **absents** — jamais inférés. Si un LLM produit malgré tout `prenom=Pedro`, `nom=Miguel` : T2 détecte `[pedro, miguel]` contigu dans les segments concordance, aucune protection P1/P2/P3 ⇒ retrait de `prenom`/`nom`, recalcul `missingFields=[prenom, nom]` (ordre canonique §3) ⇒ `422` outcome `MISSING_INFORMATION` posant **une seule question explicite d'identité** (pas de re-demande corrective des formes concordance) ; **branche exécution 86 réelle** : si cette même extraction n'a **pas** renseigné les formes concordance (pattern exécution 86 sans A-1), `missingFields=[prenom, nom, nomIncorrect, nomCorrect]` (les 4 champs restent requis, **aucune forme n'est inventée**) ; codes **existants** uniquement ; ≤ `MAX_CLARIFICATION_ROUNDS=5` ; **0 appel LLM supplémentaire** ; **aucune valeur inventée, aucune correction silencieuse** ; `status=MISSING_INFORMATION` ; `requestId` conservé |
++| S17 | Attribution erronée d'identité depuis un segment concordance (exécution 86, valeurs fictives) | **Round 2** (`requestId` connu) ; état persisté avant le round : `MISSING_INFORMATION` avec `dateNaissance=1993-04-17` et `lieuNaissance=Nova Cidade`, **sans** `prenom`/`nom`/`nomIncorrect`/`nomCorrect` et sans déclaration d'identité antérieure ; message utilisateur : « …je suis né(e) le 17/04/1993 à Nova Cidade. Le nom figurant à l'état civil est incorrect : Pedro Miguel Santos ; le nom correct est Pedro Miguel Santhos. » ; **extraction défaillante constatée** (qwen2.5:1.5b) : `prenom=Pedro`, `nom=Miguel`, `dateNaissance=1993-04-17`, `lieuNaissance=Nova Cidade`, `nomIncorrect`/`nomCorrect` absents → **outcome constaté** `422` `MISSING_INFORMATION` `missingFields=[nomIncorrect, nomCorrect]` | round 2 : extraction → **D-1 (§6.1.3)** → E8 → E3 PATCH partiel | **Attendu avec A-1 + A-5 + D-1** : l'extraction remplit `nomIncorrect=Pedro Miguel Santos`, `nomCorrect=Pedro Miguel Santhos` (formes complètes) ; identité **non déclarée explicitement** (aucun ID-1/ID-2) ⇒ `prenom`/`nom` **absents** — jamais inférés. Si un LLM produit malgré tout `prenom=Pedro`, `nom=Miguel` : T2 détecte `[pedro, miguel]` contigu dans les segments concordance, aucune protection P1/P2/P3 ⇒ retrait de `prenom`/`nom`, recalcul `missingFields=[prenom, nom]` (ordre canonique §3) ⇒ outcome webhook `200` `MISSING_INFORMATION` (E3 `200`, ADR-002) posant **une seule question explicite d'identité** (pas de re-demande corrective des formes concordance) ; **branche exécution 86 réelle** : si cette même extraction n'a **pas** renseigné les formes concordance (pattern exécution 86 sans A-1), `missingFields=[prenom, nom, nomIncorrect, nomCorrect]` (les 4 champs restent requis, **aucune forme n'est inventée**) ; codes **existants** uniquement ; ≤ `MAX_CLARIFICATION_ROUNDS=5` ; **0 appel LLM supplémentaire** ; **aucune valeur inventée, aucune correction silencieuse** ; `status=MISSING_INFORMATION` ; `requestId` conservé |
+ 
+ ---
+ 

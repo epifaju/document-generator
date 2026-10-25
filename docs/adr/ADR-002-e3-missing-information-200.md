@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Question | Q-02 |
-| Statut | **PROPOSÉ** |
+| Statut | **ACCEPTÉ** |
 | Date | 2026-10-24 |
 | Périmètre | Itération 1 — documentation. Aucun code, contrat ou test modifié par ce fichier. |
 | Hors numérotation | Ne remplace pas le tableau ADR-01…ADR-14 de `docs/architecture.md:117-132`. |
@@ -44,4 +44,4 @@ Option 1. La complétion conversationnelle (E3) et la validation ponctuelle (E1,
 
 Lot : L0c, mention documentaire seulement. Pas de lot de code.
 
-Statut de cet ADR : **PROPOSÉ**. L'arbitrage reste humain.
+Statut de cet ADR : **ACCEPTÉ** (2026-10-25). Option 1 retenue : E3 renvoie `200` avec `status = MISSING_INFORMATION`. E1 et E4 conservent `422`.

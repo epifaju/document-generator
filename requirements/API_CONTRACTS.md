@@ -307,6 +307,7 @@ Consultation d'état (polling n8n, affichage conversationnel).
 |---|---|---|
 | `200 OK` | `RequestStatusResponse` (§2.2) | Demande existante |
 | `404 Not Found` | `ErrorResponse` (`code = REQUEST_NOT_FOUND`) | `requestId` inconnu / inexistant |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `requestId` qui n'est pas un UUID v4 — requête non traitée, rien de persisté |
 | `500` | `ErrorResponse` | Erreur technique |
 
 ---
@@ -342,6 +343,7 @@ champs présents dans le corps sont modifiés.
 |---|---|---|
 | `200 OK` | `RequestStatusResponse` (statut recalculé) | Statut **net** recalculé après fusion : `MISSING_INFORMATION` → `VALIDATED` si les 6 champs obligatoires sont désormais tous présents et toutes les règles passent (T5) ; `MISSING_INFORMATION` conservé sinon (T6b) ; `VALIDATED` conservé (T11) ou rétrogradé (`MISSING_INFORMATION` T7) ; `FAILED` repris (T12 / T12c) |
 | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée, `document_request` non modifié, `fieldErrors[0].field = Content-Type`, `fieldErrors[0].code = ERR_PAYLOAD_INVALIDE` |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | JSON malformé — `document_request` non modifié, `fieldErrors[0].field = payload`, `fieldErrors[0].code = ERR_PAYLOAD_INVALIDE`. Le même sous-code distingue ce rejet du rejet d'en-tête (`field = Content-Type`, ADR-015). |
 | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[].code = ERR_CHAMP_INCONNU` \| `ERR_CHAMP_RESERVE`) | **Clé inconnue ou réservée = erreur structurelle de requête** (arbitrage humain F-03) : `document_request` **non modifié**, **jamais** passé à `REJECTED`, aucune mutation métier persistée (un événement d'audit technique sans PII reste possible) |
 | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[]`) | Règle métier violée par les données fusionnées → `status = REJECTED` (persistée, transitions T4 / T6 / T10 / T12b) |
 | `404 Not Found` | `ErrorResponse` (`code = REQUEST_NOT_FOUND`) | Demande inconnue |
@@ -407,7 +409,7 @@ Téléchargement (autorisé) du document généré.
 | Code | Corps | Headers de réponse | Condition |
 |---|---|---|---|
 | `200 OK` | binaire DOCX (octets) | `Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document` · `Content-Disposition: attachment; filename="attestation-concordance-<requestId>.docx"` | Document existant et appartenant à la demande |
-| `404 Not Found` | `ErrorResponse` (`code = DOCUMENT_NOT_FOUND` \| `REQUEST_NOT_FOUND`) | JSON | `documentId` ou `requestId` inconnu, ou document d'une autre demande |
+| `404 Not Found` | `ErrorResponse` (`code = DOCUMENT_NOT_FOUND`) | JSON | `requestId` inconnu, `documentId` inconnu, ou document d'une autre demande |
 | `401` (itération 2) | `ErrorResponse` (`code = UNAUTHORIZED`) | JSON | Token absent/expiré |
 | `500` | `ErrorResponse` (`code = INTERNAL_ERROR`) | JSON | Erreur de lecture du stockage |
 
@@ -455,10 +457,11 @@ vérité).
 
 | HTTP | `code` (ErrorResponse) | Utilisé par |
 |---|---|---|
-| `400` | `VALIDATION_ERROR` (sous-codes `ERR_*` du pilote §10.2) | `POST /requests`, `PATCH /requests/{id}`, `POST /validate` ; `POST /extraction/validate` uniquement pour le rejet de `Content-Type` (§1.1). Le `400` de schéma E8 est un `ExtractionValidationResponse`, hors cette ligne |
+| `400` | `VALIDATION_ERROR` (sous-codes `ERR_*` du pilote §10.2) | `POST /requests`, `PATCH /requests/{id}`, `POST /validate` ; `POST /extraction/validate` uniquement pour le rejet de `Content-Type` (§1.1). Le `400` de schéma E8 est un `ExtractionValidationResponse`, hors cette ligne. `GET /requests/{id}` lorsque le chemin n'est pas un UUID v4 (rien de persisté) |
 | `401` | `UNAUTHORIZED` | tous (sauf health) — **itération 2** |
 | `403` | `FORBIDDEN` | accès à une demande d'un tiers — **itération 2** |
-| `404` | `REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` | `GET /requests/{id}`, `GET .../documents/{id}`, `POST /validate`, `POST /generate` |
+| `404` | `REQUEST_NOT_FOUND` | `GET /requests/{id}` (UUID v4 valide, demande absente), `POST /validate`, `POST /generate` |
+| `404` | `DOCUMENT_NOT_FOUND` | `GET .../documents/{id}` — demande inconnue, document inconnu, ou document d'une autre demande |
 | `409` | `INVALID_STATUS` \| `REQUEST_ALREADY_CLOSED` | `POST /validate`, `POST /generate` (`INVALID_STATUS`) ; `PATCH /requests/{id}` (`REQUEST_ALREADY_CLOSED` : demande close) |
 | `422` | `MISSING_INFORMATION` (+ `missingFields[]`) | `POST /requests`, `POST /validate` |
 | `500` | `TEMPLATE_NOT_FOUND` / `DOCUMENT_GENERATION_ERROR` / `DATABASE_ERROR` / `INTERNAL_ERROR` | `POST /generate` et endpoints généraux |

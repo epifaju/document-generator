@@ -167,7 +167,7 @@ l'évaluation) :
    (`referenceDemande`).
 3. **V normalisation** — règles du §7 appliquées.
 4. **V présence** — les 6 champs obligatoires ne sont pas absents
-   (vide/null/espaces ⇒ absent) → sinon `MISSING_INFORMATION` (422).
+   (vide/null/espaces ⇒ absent) → sinon `MISSING_INFORMATION` (HTTP 422 sur POST /requests et POST .../validate ; HTTP 200 avec status = MISSING_INFORMATION sur le PATCH — ADR-002).
 5. **V format** — motifs, longueurs, dates, enums, e-mail, téléphone.
 6. **V cohérence inter-champs** — `nomIncorrect ≠ nomCorrect`
    (comparaison après normalisation, insensible à la casse et aux espaces).
@@ -400,8 +400,10 @@ l'invariant `allOf` de `N8N_CONTRACTS.md` §5 **entendu payload-scoped**
 E8 rejetterait un round partiel pourtant correct → `502`). Le recalcul
 **fusionné payload + état** est **l'exclusivité du backend après merge**
 (V4 + N9) : lui seul décide `status`. Si ce recalcul constate ≥ 1 champ
-obligatoire absent ⇒ `status = MISSING_INFORMATION`, HTTP **422**, code
-**existant** `ERR_CHAMP_OBLIGATOIRE_ABSENT` (§10.1) — **aucun code
+obligatoire absent ⇒ `status = MISSING_INFORMATION`. Sur le PATCH (E3),
+la réponse est HTTP **200** avec ce statut (ADR-002). Le HTTP **422**
+reste celui de `POST /requests` et de `POST .../validate`. Code métier
+existant `ERR_CHAMP_OBLIGATOIRE_ABSENT` (§10.1) — **aucun code
 d'erreur API ajouté** (décision 9). La question posée à l'utilisateur
 cible **uniquement** les clés de `missingFields` : dans S17, **une seule
 question explicite d'identité**, **pas** de re-demande corrective des
@@ -594,7 +596,7 @@ Transitions **interdites** (→ `409 INVALID_STATUS` ou
 
 ## 10. CODES D'ERREUR MÉTIER (BUSINESS_ERRORS)
 
-### 10.1 Famille `MISSING_INFORMATION` — HTTP 422
+### 10.1 Famille `MISSING_INFORMATION` — HTTP 422 (E1, E4) ; HTTP 200 sur E3 (ADR-002)
 
 | Code | Champs en erreur | Message FR |
 |---|---|---|
@@ -622,7 +624,7 @@ Transitions **interdites** (→ `409 INVALID_STATUS` ou
 
 `INVALID_STATUS` (409) · `REQUEST_ALREADY_CLOSED` (409 : demande `GENERATED`
 ou `REJECTED` — rejet d'un `PATCH`) ·
-`REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` (404) ·
+`REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` (404 ; sur E6, le seul code est `DOCUMENT_NOT_FOUND`) ·
 `TEMPLATE_NOT_FOUND` (500) · `DOCUMENT_GENERATION_ERROR` (500) ·
 `DATABASE_ERROR` (500) · `INTERNAL_ERROR` (500) · `UNAUTHORIZED` (401) ·
 `FORBIDDEN` (403) — les deux derniers en itération 2 ·
@@ -653,7 +655,7 @@ Voir `requirements/API_CONTRACTS.md` pour le mapping HTTP ↔ codes.
 | S14 | Génération happy path | `status=VALIDATED`, template DOCX présent | `POST /api/v1/requests/{id}/generate` | `201` ; `documentId` présent ; `status=GENERATED` ; puis `GET .../documents/{documentId}` → `200` binaire DOCX, `Content-Disposition: attachment` |
 | S15 | Template manquant | `status=VALIDATED` mais template introuvable sur disque | `POST /api/v1/requests/{id}/generate` | `500` ; `code=TEMPLATE_NOT_FOUND` ; `status=FAILED` ; reprise : `POST .../validate` → `200 VALIDATED` puis re-`generate` |
 | S16 | Consultation état inconnu | `requestId` inexistant | `GET /api/v1/requests/{requestId}` | `404` ; `code=REQUEST_NOT_FOUND` ; aucun détail technique fuité |
-| S17 | Attribution erronée d'identité depuis un segment concordance (exécution 86, valeurs fictives) | **Round 2** (`requestId` connu) ; état persisté avant le round : `MISSING_INFORMATION` avec `dateNaissance=1993-04-17` et `lieuNaissance=Nova Cidade`, **sans** `prenom`/`nom`/`nomIncorrect`/`nomCorrect` et sans déclaration d'identité antérieure ; message utilisateur : « …je suis né(e) le 17/04/1993 à Nova Cidade. Le nom figurant à l'état civil est incorrect : Pedro Miguel Santos ; le nom correct est Pedro Miguel Santhos. » ; **extraction défaillante constatée** (qwen2.5:1.5b) : `prenom=Pedro`, `nom=Miguel`, `dateNaissance=1993-04-17`, `lieuNaissance=Nova Cidade`, `nomIncorrect`/`nomCorrect` absents → **outcome constaté** `422` `MISSING_INFORMATION` `missingFields=[nomIncorrect, nomCorrect]` | round 2 : extraction → **D-1 (§6.1.3)** → E8 → E3 PATCH partiel | **Attendu avec A-1 + A-5 + D-1** : l'extraction remplit `nomIncorrect=Pedro Miguel Santos`, `nomCorrect=Pedro Miguel Santhos` (formes complètes) ; identité **non déclarée explicitement** (aucun ID-1/ID-2) ⇒ `prenom`/`nom` **absents** — jamais inférés. Si un LLM produit malgré tout `prenom=Pedro`, `nom=Miguel` : T2 détecte `[pedro, miguel]` contigu dans les segments concordance, aucune protection P1/P2/P3 ⇒ retrait de `prenom`/`nom`, recalcul `missingFields=[prenom, nom]` (ordre canonique §3) ⇒ `422` outcome `MISSING_INFORMATION` posant **une seule question explicite d'identité** (pas de re-demande corrective des formes concordance) ; **branche exécution 86 réelle** : si cette même extraction n'a **pas** renseigné les formes concordance (pattern exécution 86 sans A-1), `missingFields=[prenom, nom, nomIncorrect, nomCorrect]` (les 4 champs restent requis, **aucune forme n'est inventée**) ; codes **existants** uniquement ; ≤ `MAX_CLARIFICATION_ROUNDS=5` ; **0 appel LLM supplémentaire** ; **aucune valeur inventée, aucune correction silencieuse** ; `status=MISSING_INFORMATION` ; `requestId` conservé |
+| S17 | Attribution erronée d'identité depuis un segment concordance (exécution 86, valeurs fictives) | **Round 2** (`requestId` connu) ; état persisté avant le round : `MISSING_INFORMATION` avec `dateNaissance=1993-04-17` et `lieuNaissance=Nova Cidade`, **sans** `prenom`/`nom`/`nomIncorrect`/`nomCorrect` et sans déclaration d'identité antérieure ; message utilisateur : « …je suis né(e) le 17/04/1993 à Nova Cidade. Le nom figurant à l'état civil est incorrect : Pedro Miguel Santos ; le nom correct est Pedro Miguel Santhos. » ; **extraction défaillante constatée** (qwen2.5:1.5b) : `prenom=Pedro`, `nom=Miguel`, `dateNaissance=1993-04-17`, `lieuNaissance=Nova Cidade`, `nomIncorrect`/`nomCorrect` absents → **outcome constaté** `422` `MISSING_INFORMATION` `missingFields=[nomIncorrect, nomCorrect]` | round 2 : extraction → **D-1 (§6.1.3)** → E8 → E3 PATCH partiel | **Attendu avec A-1 + A-5 + D-1** : l'extraction remplit `nomIncorrect=Pedro Miguel Santos`, `nomCorrect=Pedro Miguel Santhos` (formes complètes) ; identité **non déclarée explicitement** (aucun ID-1/ID-2) ⇒ `prenom`/`nom` **absents** — jamais inférés. Si un LLM produit malgré tout `prenom=Pedro`, `nom=Miguel` : T2 détecte `[pedro, miguel]` contigu dans les segments concordance, aucune protection P1/P2/P3 ⇒ retrait de `prenom`/`nom`, recalcul `missingFields=[prenom, nom]` (ordre canonique §3) ⇒ outcome webhook `200` `MISSING_INFORMATION` (E3 `200`, ADR-002) posant **une seule question explicite d'identité** (pas de re-demande corrective des formes concordance) ; **branche exécution 86 réelle** : si cette même extraction n'a **pas** renseigné les formes concordance (pattern exécution 86 sans A-1), `missingFields=[prenom, nom, nomIncorrect, nomCorrect]` (les 4 champs restent requis, **aucune forme n'est inventée**) ; codes **existants** uniquement ; ≤ `MAX_CLARIFICATION_ROUNDS=5` ; **0 appel LLM supplémentaire** ; **aucune valeur inventée, aucune correction silencieuse** ; `status=MISSING_INFORMATION` ; `requestId` conservé |
 
 ---
 
