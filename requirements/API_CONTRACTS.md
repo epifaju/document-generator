@@ -21,7 +21,7 @@ contrat uniquement, aucun code d'implémentation).
 
 | En-tête | Direction | Règle |
 |---|---|---|
-| `Content-Type` | requête (POST ou PATCH à corps JSON) | Valeurs acceptées : `application/json` et `application/json; charset=UTF-8` (casse du `charset` indifférente). En-tête absent ou toute autre valeur : `400` `VALIDATION_ERROR`, corps `ErrorResponse`, requête non traitée et non persistée (F-06). Sur `POST /api/v1/extraction/validate`, ce rejet d'en-tête est cet `ErrorResponse` ; le `400` de schéma (JSON malformé, clé inconnue, type, enum, `documentType`, date) reste un `ExtractionValidationResponse`. |
+| `Content-Type` | requête (POST ou PATCH à corps JSON) | Valeurs acceptées : `application/json` et `application/json; charset=UTF-8` (casse du `charset` indifférente). En-tête absent ou toute autre valeur : `400` `VALIDATION_ERROR`, corps `ErrorResponse`, requête non traitée et non persistée (F-06). Sur `POST /api/v1/extraction/validate`, ce rejet d'en-tête est cet `ErrorResponse` ; le `400` de schéma (JSON malformé, clé inconnue, type, enum, `documentType`, date) reste un `ExtractionValidationResponse`. Le corps de ce rejet est un `ErrorResponse` (`code = VALIDATION_ERROR`), entrée unique, `fieldErrors[0].field = Content-Type`, et `fieldErrors[0].code` vaut `ERR_PAYLOAD_INVALIDE`. Le message de cette entrée est fixe et ne reprend pas la valeur de l'en-tête reçu. Ce champ distingue le rejet d'en-tête d'une enveloppe invalide, dont le JSON malformé reste `fieldErrors[0].field = payload` avec le même sous-code. |
 | `Accept: application/json` | requête | recommandé (sauf téléchargement binaire) |
 | `X-Correlation-Id` | requête + réponse | **optionnel en entrée** : si absent, le backend en génère un (UUID v4) ; toujours renvoyé en réponse et stocké dans `ErrorResponse.correlationId` + les logs techniques (AGENTS.md §15) |
 | `Authorization: Bearer <JWT>` | requête | **hors périmètre de l'itération 1** (voir §1.3) |
@@ -278,6 +278,8 @@ exécute la validation déterministe et retourne le statut résultant.
 | `413 Payload Too Large` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Corps dépassant la taille maximale (`app.document.max-payload-bytes`, défaut 65 536 octets) → rejeté avant désérialisation, **non persistée** (documentation D2 ; valable pour tout endpoint à corps) |
 | `500 Internal Server Error` | `ErrorResponse` (`code = DATABASE_ERROR` \| `INTERNAL_ERROR`) | Erreur technique ; `correlationId` obligatoire |
 
+Précision du `400` non persistant du tableau ci-dessus : `Content-Type` absent ou non autorisé (§1.1) : requête non traitée et non persistée, `fieldErrors[0].field = Content-Type`, `fieldErrors[0].code = ERR_PAYLOAD_INVALIDE`. JSON malformé : même code HTTP et même sous-code, `fieldErrors[0].field = payload`.
+
 Exemple `422` :
 
 ```json
@@ -339,7 +341,7 @@ champs présents dans le corps sont modifiés.
 | Code | Corps | Condition |
 |---|---|---|
 | `200 OK` | `RequestStatusResponse` (statut recalculé) | Statut **net** recalculé après fusion : `MISSING_INFORMATION` → `VALIDATED` si les 6 champs obligatoires sont désormais tous présents et toutes les règles passent (T5) ; `MISSING_INFORMATION` conservé sinon (T6b) ; `VALIDATED` conservé (T11) ou rétrogradé (`MISSING_INFORMATION` T7) ; `FAILED` repris (T12 / T12c) |
-| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée, `document_request` non modifié |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée, `document_request` non modifié, `fieldErrors[0].field = Content-Type`, `fieldErrors[0].code = ERR_PAYLOAD_INVALIDE` |
 | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[].code = ERR_CHAMP_INCONNU` \| `ERR_CHAMP_RESERVE`) | **Clé inconnue ou réservée = erreur structurelle de requête** (arbitrage humain F-03) : `document_request` **non modifié**, **jamais** passé à `REJECTED`, aucune mutation métier persistée (un événement d'audit technique sans PII reste possible) |
 | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[]`) | Règle métier violée par les données fusionnées → `status = REJECTED` (persistée, transitions T4 / T6 / T10 / T12b) |
 | `404 Not Found` | `ErrorResponse` (`code = REQUEST_NOT_FOUND`) | Demande inconnue |
@@ -438,7 +440,7 @@ demande (utile à n8n comme garde de forme).
 | Code | Corps | Condition |
 |---|---|---|
 | `200 OK` | `ExtractionValidationResponse` (`valid = true`, `errors = []`) | Schéma respecté : types, clés autorisées, enums, `confidence` ∈ [0,1], `missingFields` ⊆ clés obligatoires, `documentType` supporté |
-| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée, `fieldErrors[0].field = Content-Type`, `fieldErrors[0].code = ERR_PAYLOAD_INVALIDE` |
 | `400 Bad Request` | `ExtractionValidationResponse` (`valid = false`, `errors[]` avec `path` JSON Pointer) | JSON malformé (`ERR_PAYLOAD_INVALIDE`), clé inconnue, type erroné, enum invalide, `documentType` non supporté (`ERR_DOCUMENT_TYPE_NON_SUPPORTE`), format de date non reconnu (`ERR_DATE_FORMAT_INVALIDE`) |
 | `500` | `ErrorResponse` | Erreur technique |
 

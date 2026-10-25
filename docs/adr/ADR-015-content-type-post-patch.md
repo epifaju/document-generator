@@ -66,3 +66,7 @@ Le rejet d'en-tête à l'ingress du webhook reste un `400` `VALIDATION_ERROR` : 
 ## Décision retenue
 
 Statut de cet ADR : **ACCEPTÉ**.
+
+## Addendum — lot A2, Option A (2026-10-25)
+
+Addendum — lot A2, décision humaine Option A. Le rejet d'en-tête (`400` `VALIDATION_ERROR`, `ErrorResponse`) porte `fieldErrors[0].field = Content-Type` et le sous-code existant `ERR_PAYLOAD_INVALIDE`. Aucun code d'erreur nouveau. Le handler partagé `handleUnsupportedMediaType` applique ce champ à E1, E3 et E8. Le JSON malformé reste `field = payload`. Le routage n8n de ce rejet vers `500` `INTERNAL_ERROR` s'appuie sur `fieldErrors[0].field = Content-Type`, sans détail du corps backend. Tout autre `400` `VALIDATION_ERROR` non persistant d'E1 ou d'E3, y compris `field = payload`, reste un `400` `INVALID_REQUEST`. Le critère « sans `errors[]` » de la décision ci-dessus reste uniquement pour séparer E8 d'un `400` de schéma (`ExtractionValidationResponse`, `errors[]` présent).
