@@ -275,9 +275,10 @@ Règles : le domaine n'importe ni Spring, ni JPA, ni POI, ni client IA ; les con
 |---|---|---|---|
 | 200 | — | E2, E3, E4, E7, E8 | E3 : statut **recalculé** (`VALIDATED`, `MISSING_INFORMATION`, `FAILED`→reprise) |
 | 201 | — | E1 (`VALIDATED`), E5 (`GENERATED`) | persisté |
-| 400 | `VALIDATION_ERROR` + `fieldErrors[]` | E1, E3, E4 (**E8 : corps `ExtractionValidationResponse`**, API_CONTRACTS l.440) | **Enveloppe invalide** (JSON malformé, `documentType` inconnu, clé racine inconnue, `Content-Type` ≠ JSON) → **non persisté**. **Règle métier violée dans `data`** (ex. `ERR_DATE_FUTUR`, `ERR_NOM_CONCORDANCE_IDENTIQUE`, clé inconnue dans `data` à la création) → persisté `REJECTED` + `requestId`. E3 : clé inconnue/réservée (`ERR_CHAMP_INCONNU`/`ERR_CHAMP_RESERVE`) → **aucune mutation**, jamais `REJECTED` |
+| 400 | `VALIDATION_ERROR` + `fieldErrors[]` | E1, E2 (chemin qui n'est pas un UUID v4), E3, E4 (**E8 : corps `ExtractionValidationResponse`**, API_CONTRACTS l.440) | **Enveloppe invalide** (JSON malformé, `documentType` inconnu, clé racine inconnue, `Content-Type` ≠ JSON) → **non persisté**. **Règle métier violée dans `data`** (ex. `ERR_DATE_FUTUR`, `ERR_NOM_CONCORDANCE_IDENTIQUE`, clé inconnue dans `data` à la création) → persisté `REJECTED` + `requestId`. E3 : clé inconnue/réservée (`ERR_CHAMP_INCONNU`/`ERR_CHAMP_RESERVE`) → **aucune mutation**, jamais `REJECTED`. E2 : chemin non UUID v4 → non persisté. E3 JSON malformé : `field = payload`, requête non modifiée ; le rejet d'en-tête reste `field = Content-Type`. |
 | 401 / 403 | `UNAUTHORIZED` / `FORBIDDEN` | tous sauf E7 | **it.2 seulement** |
-| 404 | `REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` | E2–E6 | — |
+| 404 | `REQUEST_NOT_FOUND` | E2, E3, E4, E5 | UUID v4 valide, demande absente |
+| 404 | `DOCUMENT_NOT_FOUND` | E6 | demande inconnue, document inconnu, ou document d'une autre demande |
 | 409 | `INVALID_STATUS` | E4, E5 | statut source interdit |
 | 409 | `REQUEST_ALREADY_CLOSED` | E3 | `GENERATED` ou `REJECTED` |
 | 413 | `VALIDATION_ERROR` | tout endpoint à corps | > 65 536 octets, non persisté |
