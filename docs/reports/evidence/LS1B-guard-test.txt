@@ -1,0 +1,29 @@
+extrait isole : base + TrimEnd + garde d'hote. Aucun appel reseau.
+---
+entree: http://127.0.0.1:5678
+N8N_BASE_URL=[http://127.0.0.1:5678] N8N_BASE_URL_ALLOW_REMOTE=[]
+ACCEPTE host=127.0.0.1 base=http://127.0.0.1:5678
+---
+entree: http://localhost:5678
+N8N_BASE_URL=[http://localhost:5678] N8N_BASE_URL_ALLOW_REMOTE=[]
+ACCEPTE host=localhost base=http://localhost:5678
+---
+entree: http://127.0.0.1@exemple.test:5678
+N8N_BASE_URL=[http://127.0.0.1@exemple.test:5678] N8N_BASE_URL_ALLOW_REMOTE=[]
+Refus : N8N_BASE_URL doit viser 127.0.0.1 ou localhost. Pour un autre hôte, définir N8N_BASE_URL_ALLOW_REMOTE=1.
+---
+entree: http://127.0.0.1.exemple.test:5678
+N8N_BASE_URL=[http://127.0.0.1.exemple.test:5678] N8N_BASE_URL_ALLOW_REMOTE=[]
+Refus : N8N_BASE_URL doit viser 127.0.0.1 ou localhost. Pour un autre hôte, définir N8N_BASE_URL_ALLOW_REMOTE=1.
+---
+entree: http://exemple.test:5678
+N8N_BASE_URL=[http://exemple.test:5678] N8N_BASE_URL_ALLOW_REMOTE=[]
+Refus : N8N_BASE_URL doit viser 127.0.0.1 ou localhost. Pour un autre hôte, définir N8N_BASE_URL_ALLOW_REMOTE=1.
+---
+entree: http://exemple.test:5678 ALLOW_REMOTE=1
+N8N_BASE_URL=[http://exemple.test:5678] N8N_BASE_URL_ALLOW_REMOTE=[1]
+ACCEPTE host=exemple.test base=http://exemple.test:5678
+---
+entree: valeur vide
+N8N_BASE_URL=[] N8N_BASE_URL_ALLOW_REMOTE=[]
+ACCEPTE host=127.0.0.1 base=http://127.0.0.1:5678
