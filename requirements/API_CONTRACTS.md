@@ -21,7 +21,7 @@ contrat uniquement, aucun code d'implémentation).
 
 | En-tête | Direction | Règle |
 |---|---|---|
-| `Content-Type: application/json; charset=UTF-8` | requête (tous les POST) | obligatoire pour les corps JSON ; **toute autre valeur** → `400` `VALIDATION_ERROR` (corps `ErrorResponse`, requête non traitée, **non persistée** — comportement F-06) |
+| `Content-Type` | requête (POST ou PATCH à corps JSON) | Valeurs acceptées : `application/json` et `application/json; charset=UTF-8` (casse du `charset` indifférente). En-tête absent ou toute autre valeur : `400` `VALIDATION_ERROR`, corps `ErrorResponse`, requête non traitée et non persistée (F-06). Sur `POST /api/v1/extraction/validate`, ce rejet d'en-tête est cet `ErrorResponse` ; le `400` de schéma (JSON malformé, clé inconnue, type, enum, `documentType`, date) reste un `ExtractionValidationResponse`. |
 | `Accept: application/json` | requête | recommandé (sauf téléchargement binaire) |
 | `X-Correlation-Id` | requête + réponse | **optionnel en entrée** : si absent, le backend en génère un (UUID v4) ; toujours renvoyé en réponse et stocké dans `ErrorResponse.correlationId` + les logs techniques (AGENTS.md §15) |
 | `Authorization: Bearer <JWT>` | requête | **hors périmètre de l'itération 1** (voir §1.3) |
@@ -267,13 +267,13 @@ Récapitulatif :
 Crée une demande d'attestation à partir de données extraites puis normalisées,
 exécute la validation déterministe et retourne le statut résultant.
 
-- **Headers** : `Content-Type: application/json` · `X-Correlation-Id?`
+- **Headers** : `Content-Type` : `application/json` ou `application/json; charset=UTF-8` (§1.1) · `X-Correlation-Id?`
 - **Request** : `CreateRequestRequest` (§2.1)
 
 | Code | Corps | Condition |
 |---|---|---|
 | `201 Created` | `RequestStatusResponse` (`status = VALIDATED`, `missingFields = []`) | Toutes les règles passent |
-| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Enveloppe invalide (JSON malformé, `documentType` inconnu → **non persistée**) **ou** règle métier violée (`fieldErrors[]` → **persistée en `REJECTED`**, `requestId` retourné) |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Enveloppe invalide (JSON malformé, `documentType` inconnu → **non persistée**), `Content-Type` absent ou non autorisé (§1.1 → **non persistée**) **ou** règle métier violée (`fieldErrors[]` → **persistée en `REJECTED`**, `requestId` retourné) |
 | `422 Unprocessable Entity` | `ErrorResponse` (`code = MISSING_INFORMATION`, `missingFields[]`) | ≥ 1 champ obligatoire absent → **persistée en `MISSING_INFORMATION`**, `requestId` retourné |
 | `413 Payload Too Large` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Corps dépassant la taille maximale (`app.document.max-payload-bytes`, défaut 65 536 octets) → rejeté avant désérialisation, **non persistée** (documentation D2 ; valable pour tout endpoint à corps) |
 | `500 Internal Server Error` | `ErrorResponse` (`code = DATABASE_ERROR` \| `INTERNAL_ERROR`) | Erreur technique ; `correlationId` obligatoire |
@@ -317,7 +317,7 @@ fournis sur les données persistées, puis **recalcule le statut** par
 validation déterministe. Aucune donnée n'est jamais inventée : seuls les
 champs présents dans le corps sont modifiés.
 
-- **Headers** : `Content-Type: application/json` · `X-Correlation-Id?`
+- **Headers** : `Content-Type` : `application/json` ou `application/json; charset=UTF-8` (§1.1) · `X-Correlation-Id?`
 - **Request** : objet partiel des champs du document (toutes les clés sont
   **optionnelles** dans ce payload — au minimum les 6 champs obligatoires
   et les champs optionnels du pilote §3/§4) :
@@ -339,6 +339,7 @@ champs présents dans le corps sont modifiés.
 | Code | Corps | Condition |
 |---|---|---|
 | `200 OK` | `RequestStatusResponse` (statut recalculé) | Statut **net** recalculé après fusion : `MISSING_INFORMATION` → `VALIDATED` si les 6 champs obligatoires sont désormais tous présents et toutes les règles passent (T5) ; `MISSING_INFORMATION` conservé sinon (T6b) ; `VALIDATED` conservé (T11) ou rétrogradé (`MISSING_INFORMATION` T7) ; `FAILED` repris (T12 / T12c) |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée, `document_request` non modifié |
 | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[].code = ERR_CHAMP_INCONNU` \| `ERR_CHAMP_RESERVE`) | **Clé inconnue ou réservée = erreur structurelle de requête** (arbitrage humain F-03) : `document_request` **non modifié**, **jamais** passé à `REJECTED`, aucune mutation métier persistée (un événement d'audit technique sans PII reste possible) |
 | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[]`) | Règle métier violée par les données fusionnées → `status = REJECTED` (persistée, transitions T4 / T6 / T10 / T12b) |
 | `404 Not Found` | `ErrorResponse` (`code = REQUEST_NOT_FOUND`) | Demande inconnue |
@@ -431,12 +432,13 @@ en production.
 Valide un JSON d'extraction IA contre le schéma **avant** toute création de
 demande (utile à n8n comme garde de forme).
 
-- **Headers** : `Content-Type: application/json` · `X-Correlation-Id?`
+- **Headers** : `Content-Type` : `application/json` ou `application/json; charset=UTF-8` (§1.1) · `X-Correlation-Id?`
 - **Request** : `ExtractionResult` (§2.4) — corps brut à contrôler
 
 | Code | Corps | Condition |
 |---|---|---|
 | `200 OK` | `ExtractionValidationResponse` (`valid = true`, `errors = []`) | Schéma respecté : types, clés autorisées, enums, `confidence` ∈ [0,1], `missingFields` ⊆ clés obligatoires, `documentType` supporté |
+| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée |
 | `400 Bad Request` | `ExtractionValidationResponse` (`valid = false`, `errors[]` avec `path` JSON Pointer) | JSON malformé (`ERR_PAYLOAD_INVALIDE`), clé inconnue, type erroné, enum invalide, `documentType` non supporté (`ERR_DOCUMENT_TYPE_NON_SUPPORTE`), format de date non reconnu (`ERR_DATE_FORMAT_INVALIDE`) |
 | `500` | `ErrorResponse` | Erreur technique |
 
@@ -451,7 +453,7 @@ vérité).
 
 | HTTP | `code` (ErrorResponse) | Utilisé par |
 |---|---|---|
-| `400` | `VALIDATION_ERROR` (sous-codes `ERR_*` du pilote §10.2) | `POST /requests`, `POST /validate`, `POST /extraction/validate` |
+| `400` | `VALIDATION_ERROR` (sous-codes `ERR_*` du pilote §10.2) | `POST /requests`, `PATCH /requests/{id}`, `POST /validate` ; `POST /extraction/validate` uniquement pour le rejet de `Content-Type` (§1.1). Le `400` de schéma E8 est un `ExtractionValidationResponse`, hors cette ligne |
 | `401` | `UNAUTHORIZED` | tous (sauf health) — **itération 2** |
 | `403` | `FORBIDDEN` | accès à une demande d'un tiers — **itération 2** |
 | `404` | `REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` | `GET /requests/{id}`, `GET .../documents/{id}`, `POST /validate`, `POST /generate` |
@@ -461,8 +463,10 @@ vérité).
 | `503` | `HealthResponse.status = DOWN` | `GET /health` |
 
 Familles supplémentaires hors API (flux n8n, AGENTS.md §14) :
-`AI_EXTRACTION_ERROR`, `EXTRACTION_SCHEMA_INVALID` (interne au comportement
-`400` de `/extraction/validate`).
+`AI_EXTRACTION_ERROR`, `EXTRACTION_SCHEMA_INVALID` (interne au `400` de
+schéma de `/extraction/validate`, corps `ExtractionValidationResponse`).
+Le rejet d'en-tête sur cet endpoint est un `ErrorResponse`
+`VALIDATION_ERROR` (§1.1), distinct de ce `400` de schéma.
 
 ---
 

@@ -27,7 +27,7 @@ pilote. n8n ne fait que **router** ces résultats vers l'utilisateur.
 
 | En-tête | Direction | Règle |
 |---|---|---|
-| `Content-Type: application/json; charset=UTF-8` | requête (webhook) | obligatoire ; toute autre valeur → `400` `VALIDATION_ERROR`, corps non traité (miroir F-06 du contrat backend) |
+| `Content-Type` | requête (webhook) | Valeurs acceptées : `application/json` et `application/json; charset=UTF-8` (casse du `charset` indifférente). En-tête absent ou toute autre valeur → `400` `VALIDATION_ERROR`, corps non traité (miroir F-06, API_CONTRACTS §1.1) |
 | `Content-Type: application/json` | réponse | toujours ; n8n ne renvoie **jamais** de binaire (cf. §6) |
 | `X-Correlation-Id` | requête | **optionnel en entrée** ; format accepté `^[A-Za-z0-9-]{8,64}$` (anti log-injection **et** sous-ensemble strict du filtre backend `^[A-Za-z0-9-]{1,64}$` — `CorrelationIdFilter` : une valeur non conforme est **écartée en entier** et remplacée par un UUID v4, cassant la chaîne §12.1) ; absent ou invalide → n8n génère un UUID v4 |
 | `X-Correlation-Id` | réponse | **toujours renvoyé par toute réponse émise par le workflow** (exception native §3.1 : kill `EXECUTIONS_TIMEOUT` / transport exclu), identique à la valeur retenue ; idem dans le corps (`correlationId`) |
@@ -171,19 +171,24 @@ jamais être confondus avec lui.
 | `200` | `GENERATION_FAILED` | — | `500` E5 persistant après récupération bornée (T9 sans T12 réussi) |
 | `200` | `UNSUPPORTED_DOCUMENT_TYPE` | — | E8 `400` avec `ERR_DOCUMENT_TYPE_NON_SUPPORTE` |
 | `200` | `CLARIFICATION_LIMIT_REACHED` | — | borne `MAX_CLARIFICATION_ROUNDS` atteinte (§5) |
-| `400` | `INVALID_REQUEST` | `VALIDATION_ERROR` | ingress invalide (§2) ; E1 `400` **sans** `requestId` (non persisté) ; E3 `400` **non persistant** (clé inconnue/réservée — `document_request` non modifié, API_CONTRACTS §3.3) |
+| `400` | `INVALID_REQUEST` | `VALIDATION_ERROR` | ingress invalide (§2) ; E1 `400` **sans** `requestId` (non persisté), **sauf** rejet d'en-tête Content-Type ; E3 `400` **non persistant** (clé inconnue/réservée — `document_request` non modifié, API_CONTRACTS §3.3), **sauf** rejet d'en-tête Content-Type. Ce rejet (E1, E3 ou E8) est routé en `500` `INTERNAL_ERROR` |
 | `404` | `REQUEST_NOT_FOUND` | `REQUEST_NOT_FOUND` | E2 `404` : `requestId` client inconnu (erreur d'entrée, aucune persistance) |
 | — (jamais relayé) | — | — | `409` backend (E3 `REQUEST_ALREADY_CLOSED`, E4 `INVALID_STATUS`) → **réconciliation `E2` d'abord** puis routage (§4/§5) — jamais de `409` sortant de n8n |
 | `502` | `ERROR` | `AI_EXTRACTION_ERROR` | LLM injoignable/timeout après `AI_MAX_ATTEMPTS` ou sortie non JSON strict (**jamais** utilisé pour un rejet E8) |
-| `502` | `ERROR` | `EXTRACTION_SCHEMA_INVALID` | E8 `400` dont `errors[]` ne contient **pas** `ERR_DOCUMENT_TYPE_NON_SUPPORTE` |
+| `502` | `ERROR` | `EXTRACTION_SCHEMA_INVALID` | E8 `400` `ExtractionValidationResponse` (`errors[]` présent) dont `errors[]` ne contient **pas** `ERR_DOCUMENT_TYPE_NON_SUPPORTE` |
 | `503` | `ERROR` | `BACKEND_UNAVAILABLE` | backend injoignable / échecs bornés sur E1–E8 (hors cas routés ci-dessus) |
-| `500` | `ERROR` | `INTERNAL_ERROR` | bug d'orchestration n8n (ex. `404` inattendu, E6 `404` post-génération) |
+| `500` | `ERROR` | `INTERNAL_ERROR` | bug d'orchestration n8n (ex. `404` inattendu, E6 `404` post-génération) ; rejet d'en-tête Content-Type sur E1, E3 ou E8 (`ErrorResponse`, `code = VALIDATION_ERROR`, sans `errors[]`) — n8n envoie l'en-tête, sans détail du corps backend |
 
-**Discrimination E8 `400` (règle unique)** : `errors[]` contient
+**Discrimination E8 `400`** : corps `ExtractionValidationResponse`
+(`errors[]` présent) — `errors[]` contient
 `ERR_DOCUMENT_TYPE_NON_SUPPORTE` → outcome `200`
-`UNSUPPORTED_DOCUMENT_TYPE` ; tout autre `400` E8 → `502`
-`EXTRACTION_SCHEMA_INVALID`. `AI_EXTRACTION_ERROR` est réservé aux
-échecs LLM/parse (jamais à un rejet E8 déterministe).
+`UNSUPPORTED_DOCUMENT_TYPE` ; tout autre contenu de `errors[]` → `502`
+`EXTRACTION_SCHEMA_INVALID`. Corps `ErrorResponse`
+(`code = VALIDATION_ERROR`, sans `errors[]`) sur E1, E3 ou E8 : rejet
+d'en-tête Content-Type (API_CONTRACTS §1.1). n8n envoie cet en-tête :
+défaut d'orchestration → `500` `INTERNAL_ERROR`, sans détail du corps
+backend. `AI_EXTRACTION_ERROR` est réservé aux échecs LLM/parse (jamais
+à un rejet E8 déterministe).
 
 **Règle par défaut** : tout statut backend non listé ci-dessus **et non
 géré par §4/§5 (ex. `409` ou `500 DATABASE_ERROR` → d'abord E2)**
@@ -354,11 +359,11 @@ Ingress invalide (§2, exemple complet au même format), E1 `400` sans
 
 | Code | HTTP | Origine | Statut contrat |
 |---|---|---|---|
-| `VALIDATION_ERROR` | 400 | ingress webhook (§2) ; E1 `400` non persistant | existant (AGENTS.md §14, API_CONTRACTS) |
+| `VALIDATION_ERROR` | 400 | ingress webhook (§2) ; E1 `400` non persistant autre que le rejet d'en-tête Content-Type (§3.2) | existant (AGENTS.md §14, API_CONTRACTS) |
 | `AI_EXTRACTION_ERROR` | 502 | LLM injoignable/timeout/`5xx` après tentatives bornées, sortie non JSON strict (**jamais** un rejet E8, cf. §3.2) | existant (AGENTS.md §14 : « flux n8n ») |
-| `EXTRACTION_SCHEMA_INVALID` | 502 | E8 `400` détaillé (hors type non supporté) | existant (contrat pilote §10.3) |
+| `EXTRACTION_SCHEMA_INVALID` | 502 | E8 `400` `ExtractionValidationResponse` (`errors[]` présent, hors `ERR_DOCUMENT_TYPE_NON_SUPPORTE`, §3.2) | existant (contrat pilote §10.3) |
 | `BACKEND_UNAVAILABLE` | 503 | échecs bornés d'accès backend | **nouveau, local n8n** — AGENTS.md §14 donne des « Examples » non exhaustifs ; justifié : distinguer « backend down » d'« erreur interne » dans l'observabilité (§12 du doc d'architecture) |
-| `INTERNAL_ERROR` | 500 | bug d'orchestration | existant |
+| `INTERNAL_ERROR` | 500 | bug d'orchestration, y compris le rejet d'en-tête Content-Type sur E1, E3 ou E8 (§3.2) | existant |
 | `REQUEST_NOT_FOUND` | 404 | E2 : `requestId` client inconnu | existant (relayé depuis le code backend `REQUEST_NOT_FOUND`, jamais produit par n8n) |
 
 Codes **réservés à l'it.2** : `UNAUTHORIZED` / `FORBIDDEN` (dès
@@ -478,6 +483,7 @@ requise pour la correction du flux ; la reprise se fait uniquement par
 - Historique :
   - `v1` — 2026-10-04 — création (Phase I.0).
   - `v1` — 2026-10-24 — Q-01, ADR-001 : le PATCH `200` ne route plus `REJECTED` ; un `400` métier persisté `REJECTED` (T4 / T6 / T10 / T12b) produit l'outcome `REJECTED`.
+  - `v1` — 2026-10-25 — Content-Type : `application/json` et `application/json; charset=UTF-8` (casse du charset indifférente), y compris le webhook. Rejet d'en-tête backend sur E1, E3 ou E8 (`ErrorResponse`, sans `errors[]`) routé en `500` `INTERNAL_ERROR`. Décision humaine, ADR-015.
 
 ---
 

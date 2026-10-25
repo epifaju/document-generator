@@ -1,0 +1,362 @@
+=== Lot L0c-CT — evidence diff ===
+Date: 2026-10-25
+Working directory: C:\Users\epifa\cursor-workspace\document-generator
+Commands:
+  git status --short
+  git diff -- requirements/API_CONTRACTS.md requirements/N8N_CONTRACTS.md
+  git diff --no-index -- NUL docs/adr/ADR-015-content-type-post-patch.md
+  git diff --no-index -- NUL docs/reports/L0c-CT.md
+
+--- git status --short ---
+ M requirements/API_CONTRACTS.md
+ M requirements/N8N_CONTRACTS.md
+?? docs/adr/ADR-015-content-type-post-patch.md
+?? docs/reports/L0c-CT.md
+--- git diff -- requirements/API_CONTRACTS.md requirements/N8N_CONTRACTS.md ---
+git : warning: LF will be replaced by CRLF in requirements/API_CONTRACTS.md.
+Au caractère Ligne:1 : 1064
++ ... --"); $d1 = git diff -- requirements/API_CONTRACTS.md requirements/N8 ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: LF wil...I_CONTRACTS.md.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in requirements/N8N_CONTRACTS.md.
+The file will have its original line endings in your working directory
+diff --git a/requirements/API_CONTRACTS.md b/requirements/API_CONTRACTS.md
+index b1e90e4..5b18e45 100644
+--- a/requirements/API_CONTRACTS.md
++++ b/requirements/API_CONTRACTS.md
+@@ -21,7 +21,7 @@ contrat uniquement, aucun code d'implémentation).
+ 
+ | En-tête | Direction | Règle |
+ |---|---|---|
+-| `Content-Type: application/json; charset=UTF-8` | requête (tous les POST) | obligatoire pour les corps JSON ; **toute autre valeur** → `400` `VALIDATION_ERROR` (corps `ErrorResponse`, requête non traitée, **non persistée** — comportement F-06) |
++| `Content-Type` | requête (POST ou PATCH à corps JSON) | Valeurs acceptées : `application/json` et `application/json; charset=UTF-8` (casse du `charset` indifférente). En-tête absent ou toute autre valeur : `400` `VALIDATION_ERROR`, corps `ErrorResponse`, requête non traitée et non persistée (F-06). Sur `POST /api/v1/extraction/validate`, ce rejet d'en-tête est cet `ErrorResponse` ; le `400` de schéma (JSON malformé, clé inconnue, type, enum, `documentType`, date) reste un `ExtractionValidationResponse`. |
+ | `Accept: application/json` | requête | recommandé (sauf téléchargement binaire) |
+ | `X-Correlation-Id` | requête + réponse | **optionnel en entrée** : si absent, le backend en génère un (UUID v4) ; toujours renvoyé en réponse et stocké dans `ErrorResponse.correlationId` + les logs techniques (AGENTS.md §15) |
+ | `Authorization: Bearer <JWT>` | requête | **hors périmètre de l'itération 1** (voir §1.3) |
+@@ -267,13 +267,13 @@ Récapitulatif :
+ Crée une demande d'attestation à partir de données extraites puis normalisées,
+ exécute la validation déterministe et retourne le statut résultant.
+ 
+-- **Headers** : `Content-Type: application/json` · `X-Correlation-Id?`
++- **Headers** : `Content-Type` : `application/json` ou `application/json; charset=UTF-8` (§1.1) · `X-Correlation-Id?`
+ - **Request** : `CreateRequestRequest` (§2.1)
+ 
+ | Code | Corps | Condition |
+ |---|---|---|
+ | `201 Created` | `RequestStatusResponse` (`status = VALIDATED`, `missingFields = []`) | Toutes les règles passent |
+-| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Enveloppe invalide (JSON malformé, `documentType` inconnu → **non persistée**) **ou** règle métier violée (`fieldErrors[]` → **persistée en `REJECTED`**, `requestId` retourné) |
++| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Enveloppe invalide (JSON malformé, `documentType` inconnu → **non persistée**), `Content-Type` absent ou non autorisé (§1.1 → **non persistée**) **ou** règle métier violée (`fieldErrors[]` → **persistée en `REJECTED`**, `requestId` retourné) |
+ | `422 Unprocessable Entity` | `ErrorResponse` (`code = MISSING_INFORMATION`, `missingFields[]`) | ≥ 1 champ obligatoire absent → **persistée en `MISSING_INFORMATION`**, `requestId` retourné |
+ | `413 Payload Too Large` | `ErrorResponse` (`code = VALIDATION_ERROR`) | Corps dépassant la taille maximale (`app.document.max-payload-bytes`, défaut 65 536 octets) → rejeté avant désérialisation, **non persistée** (documentation D2 ; valable pour tout endpoint à corps) |
+ | `500 Internal Server Error` | `ErrorResponse` (`code = DATABASE_ERROR` \| `INTERNAL_ERROR`) | Erreur technique ; `correlationId` obligatoire |
+@@ -317,7 +317,7 @@ fournis sur les données persistées, puis **recalcule le statut** par
+ validation déterministe. Aucune donnée n'est jamais inventée : seuls les
+ champs présents dans le corps sont modifiés.
+ 
+-- **Headers** : `Content-Type: application/json` · `X-Correlation-Id?`
++- **Headers** : `Content-Type` : `application/json` ou `application/json; charset=UTF-8` (§1.1) · `X-Correlation-Id?`
+ - **Request** : objet partiel des champs du document (toutes les clés sont
+   **optionnelles** dans ce payload — au minimum les 6 champs obligatoires
+   et les champs optionnels du pilote §3/§4) :
+@@ -339,6 +339,7 @@ champs présents dans le corps sont modifiés.
+ | Code | Corps | Condition |
+ |---|---|---|
+ | `200 OK` | `RequestStatusResponse` (statut recalculé) | Statut **net** recalculé après fusion : `MISSING_INFORMATION` → `VALIDATED` si les 6 champs obligatoires sont désormais tous présents et toutes les règles passent (T5) ; `MISSING_INFORMATION` conservé sinon (T6b) ; `VALIDATED` conservé (T11) ou rétrogradé (`MISSING_INFORMATION` T7) ; `FAILED` repris (T12 / T12c) |
++| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée, `document_request` non modifié |
+ | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[].code = ERR_CHAMP_INCONNU` \| `ERR_CHAMP_RESERVE`) | **Clé inconnue ou réservée = erreur structurelle de requête** (arbitrage humain F-03) : `document_request` **non modifié**, **jamais** passé à `REJECTED`, aucune mutation métier persistée (un événement d'audit technique sans PII reste possible) |
+ | `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`, `fieldErrors[]`) | Règle métier violée par les données fusionnées → `status = REJECTED` (persistée, transitions T4 / T6 / T10 / T12b) |
+ | `404 Not Found` | `ErrorResponse` (`code = REQUEST_NOT_FOUND`) | Demande inconnue |
+@@ -431,12 +432,13 @@ en production.
+ Valide un JSON d'extraction IA contre le schéma **avant** toute création de
+ demande (utile à n8n comme garde de forme).
+ 
+-- **Headers** : `Content-Type: application/json` · `X-Correlation-Id?`
++- **Headers** : `Content-Type` : `application/json` ou `application/json; charset=UTF-8` (§1.1) · `X-Correlation-Id?`
+ - **Request** : `ExtractionResult` (§2.4) — corps brut à contrôler
+ 
+ | Code | Corps | Condition |
+ |---|---|---|
+ | `200 OK` | `ExtractionValidationResponse` (`valid = true`, `errors = []`) | Schéma respecté : types, clés autorisées, enums, `confidence` ∈ [0,1], `missingFields` ⊆ clés obligatoires, `documentType` supporté |
++| `400 Bad Request` | `ErrorResponse` (`code = VALIDATION_ERROR`) | `Content-Type` absent ou non autorisé (§1.1) — requête non traitée |
+ | `400 Bad Request` | `ExtractionValidationResponse` (`valid = false`, `errors[]` avec `path` JSON Pointer) | JSON malformé (`ERR_PAYLOAD_INVALIDE`), clé inconnue, type erroné, enum invalide, `documentType` non supporté (`ERR_DOCUMENT_TYPE_NON_SUPPORTE`), format de date non reconnu (`ERR_DATE_FORMAT_INVALIDE`) |
+ | `500` | `ErrorResponse` | Erreur technique |
+ 
+@@ -451,7 +453,7 @@ vérité).
+ 
+ | HTTP | `code` (ErrorResponse) | Utilisé par |
+ |---|---|---|
+-| `400` | `VALIDATION_ERROR` (sous-codes `ERR_*` du pilote §10.2) | `POST /requests`, `POST /validate`, `POST /extraction/validate` |
++| `400` | `VALIDATION_ERROR` (sous-codes `ERR_*` du pilote §10.2) | `POST /requests`, `PATCH /requests/{id}`, `POST /validate` ; `POST /extraction/validate` uniquement pour le rejet de `Content-Type` (§1.1). Le `400` de schéma E8 est un `ExtractionValidationResponse`, hors cette ligne |
+ | `401` | `UNAUTHORIZED` | tous (sauf health) — **itération 2** |
+ | `403` | `FORBIDDEN` | accès à une demande d'un tiers — **itération 2** |
+ | `404` | `REQUEST_NOT_FOUND` / `DOCUMENT_NOT_FOUND` | `GET /requests/{id}`, `GET .../documents/{id}`, `POST /validate`, `POST /generate` |
+@@ -461,8 +463,10 @@ vérité).
+ | `503` | `HealthResponse.status = DOWN` | `GET /health` |
+ 
+ Familles supplémentaires hors API (flux n8n, AGENTS.md §14) :
+-`AI_EXTRACTION_ERROR`, `EXTRACTION_SCHEMA_INVALID` (interne au comportement
+-`400` de `/extraction/validate`).
++`AI_EXTRACTION_ERROR`, `EXTRACTION_SCHEMA_INVALID` (interne au `400` de
++schéma de `/extraction/validate`, corps `ExtractionValidationResponse`).
++Le rejet d'en-tête sur cet endpoint est un `ErrorResponse`
++`VALIDATION_ERROR` (§1.1), distinct de ce `400` de schéma.
+ 
+ ---
+ 
+diff --git a/requirements/N8N_CONTRACTS.md b/requirements/N8N_CONTRACTS.md
+index 088008a..01d8815 100644
+--- a/requirements/N8N_CONTRACTS.md
++++ b/requirements/N8N_CONTRACTS.md
+@@ -27,7 +27,7 @@ pilote. n8n ne fait que **router** ces résultats vers l'utilisateur.
+ 
+ | En-tête | Direction | Règle |
+ |---|---|---|
+-| `Content-Type: application/json; charset=UTF-8` | requête (webhook) | obligatoire ; toute autre valeur → `400` `VALIDATION_ERROR`, corps non traité (miroir F-06 du contrat backend) |
++| `Content-Type` | requête (webhook) | Valeurs acceptées : `application/json` et `application/json; charset=UTF-8` (casse du `charset` indifférente). En-tête absent ou toute autre valeur → `400` `VALIDATION_ERROR`, corps non traité (miroir F-06, API_CONTRACTS §1.1) |
+ | `Content-Type: application/json` | réponse | toujours ; n8n ne renvoie **jamais** de binaire (cf. §6) |
+ | `X-Correlation-Id` | requête | **optionnel en entrée** ; format accepté `^[A-Za-z0-9-]{8,64}$` (anti log-injection **et** sous-ensemble strict du filtre backend `^[A-Za-z0-9-]{1,64}$` — `CorrelationIdFilter` : une valeur non conforme est **écartée en entier** et remplacée par un UUID v4, cassant la chaîne §12.1) ; absent ou invalide → n8n génère un UUID v4 |
+ | `X-Correlation-Id` | réponse | **toujours renvoyé par toute réponse émise par le workflow** (exception native §3.1 : kill `EXECUTIONS_TIMEOUT` / transport exclu), identique à la valeur retenue ; idem dans le corps (`correlationId`) |
+@@ -171,19 +171,24 @@ jamais être confondus avec lui.
+ | `200` | `GENERATION_FAILED` | — | `500` E5 persistant après récupération bornée (T9 sans T12 réussi) |
+ | `200` | `UNSUPPORTED_DOCUMENT_TYPE` | — | E8 `400` avec `ERR_DOCUMENT_TYPE_NON_SUPPORTE` |
+ | `200` | `CLARIFICATION_LIMIT_REACHED` | — | borne `MAX_CLARIFICATION_ROUNDS` atteinte (§5) |
+-| `400` | `INVALID_REQUEST` | `VALIDATION_ERROR` | ingress invalide (§2) ; E1 `400` **sans** `requestId` (non persisté) ; E3 `400` **non persistant** (clé inconnue/réservée — `document_request` non modifié, API_CONTRACTS §3.3) |
++| `400` | `INVALID_REQUEST` | `VALIDATION_ERROR` | ingress invalide (§2) ; E1 `400` **sans** `requestId` (non persisté), **sauf** rejet d'en-tête Content-Type ; E3 `400` **non persistant** (clé inconnue/réservée — `document_request` non modifié, API_CONTRACTS §3.3), **sauf** rejet d'en-tête Content-Type. Ce rejet (E1, E3 ou E8) est routé en `500` `INTERNAL_ERROR` |
+ | `404` | `REQUEST_NOT_FOUND` | `REQUEST_NOT_FOUND` | E2 `404` : `requestId` client inconnu (erreur d'entrée, aucune persistance) |
+ | — (jamais relayé) | — | — | `409` backend (E3 `REQUEST_ALREADY_CLOSED`, E4 `INVALID_STATUS`) → **réconciliation `E2` d'abord** puis routage (§4/§5) — jamais de `409` sortant de n8n |
+ | `502` | `ERROR` | `AI_EXTRACTION_ERROR` | LLM injoignable/timeout après `AI_MAX_ATTEMPTS` ou sortie non JSON strict (**jamais** utilisé pour un rejet E8) |
+-| `502` | `ERROR` | `EXTRACTION_SCHEMA_INVALID` | E8 `400` dont `errors[]` ne contient **pas** `ERR_DOCUMENT_TYPE_NON_SUPPORTE` |
++| `502` | `ERROR` | `EXTRACTION_SCHEMA_INVALID` | E8 `400` `ExtractionValidationResponse` (`errors[]` présent) dont `errors[]` ne contient **pas** `ERR_DOCUMENT_TYPE_NON_SUPPORTE` |
+ | `503` | `ERROR` | `BACKEND_UNAVAILABLE` | backend injoignable / échecs bornés sur E1–E8 (hors cas routés ci-dessus) |
+-| `500` | `ERROR` | `INTERNAL_ERROR` | bug d'orchestration n8n (ex. `404` inattendu, E6 `404` post-génération) |
++| `500` | `ERROR` | `INTERNAL_ERROR` | bug d'orchestration n8n (ex. `404` inattendu, E6 `404` post-génération) ; rejet d'en-tête Content-Type sur E1, E3 ou E8 (`ErrorResponse`, `code = VALIDATION_ERROR`, sans `errors[]`) — n8n envoie l'en-tête, sans détail du corps backend |
+ 
+-**Discrimination E8 `400` (règle unique)** : `errors[]` contient
++**Discrimination E8 `400`** : corps `ExtractionValidationResponse`
++(`errors[]` présent) — `errors[]` contient
+ `ERR_DOCUMENT_TYPE_NON_SUPPORTE` → outcome `200`
+-`UNSUPPORTED_DOCUMENT_TYPE` ; tout autre `400` E8 → `502`
+-`EXTRACTION_SCHEMA_INVALID`. `AI_EXTRACTION_ERROR` est réservé aux
+-échecs LLM/parse (jamais à un rejet E8 déterministe).
++`UNSUPPORTED_DOCUMENT_TYPE` ; tout autre contenu de `errors[]` → `502`
++`EXTRACTION_SCHEMA_INVALID`. Corps `ErrorResponse`
++(`code = VALIDATION_ERROR`, sans `errors[]`) sur E1, E3 ou E8 : rejet
++d'en-tête Content-Type (API_CONTRACTS §1.1). n8n envoie cet en-tête :
++défaut d'orchestration → `500` `INTERNAL_ERROR`, sans détail du corps
++backend. `AI_EXTRACTION_ERROR` est réservé aux échecs LLM/parse (jamais
++à un rejet E8 déterministe).
+ 
+ **Règle par défaut** : tout statut backend non listé ci-dessus **et non
+ géré par §4/§5 (ex. `409` ou `500 DATABASE_ERROR` → d'abord E2)**
+@@ -354,11 +359,11 @@ Ingress invalide (§2, exemple complet au même format), E1 `400` sans
+ 
+ | Code | HTTP | Origine | Statut contrat |
+ |---|---|---|---|
+-| `VALIDATION_ERROR` | 400 | ingress webhook (§2) ; E1 `400` non persistant | existant (AGENTS.md §14, API_CONTRACTS) |
++| `VALIDATION_ERROR` | 400 | ingress webhook (§2) ; E1 `400` non persistant autre que le rejet d'en-tête Content-Type (§3.2) | existant (AGENTS.md §14, API_CONTRACTS) |
+ | `AI_EXTRACTION_ERROR` | 502 | LLM injoignable/timeout/`5xx` après tentatives bornées, sortie non JSON strict (**jamais** un rejet E8, cf. §3.2) | existant (AGENTS.md §14 : « flux n8n ») |
+-| `EXTRACTION_SCHEMA_INVALID` | 502 | E8 `400` détaillé (hors type non supporté) | existant (contrat pilote §10.3) |
++| `EXTRACTION_SCHEMA_INVALID` | 502 | E8 `400` `ExtractionValidationResponse` (`errors[]` présent, hors `ERR_DOCUMENT_TYPE_NON_SUPPORTE`, §3.2) | existant (contrat pilote §10.3) |
+ | `BACKEND_UNAVAILABLE` | 503 | échecs bornés d'accès backend | **nouveau, local n8n** — AGENTS.md §14 donne des « Examples » non exhaustifs ; justifié : distinguer « backend down » d'« erreur interne » dans l'observabilité (§12 du doc d'architecture) |
+-| `INTERNAL_ERROR` | 500 | bug d'orchestration | existant |
++| `INTERNAL_ERROR` | 500 | bug d'orchestration, y compris le rejet d'en-tête Content-Type sur E1, E3 ou E8 (§3.2) | existant |
+ | `REQUEST_NOT_FOUND` | 404 | E2 : `requestId` client inconnu | existant (relayé depuis le code backend `REQUEST_NOT_FOUND`, jamais produit par n8n) |
+ 
+ Codes **réservés à l'it.2** : `UNAUTHORIZED` / `FORBIDDEN` (dès
+@@ -478,6 +483,7 @@ requise pour la correction du flux ; la reprise se fait uniquement par
+ - Historique :
+   - `v1` — 2026-10-04 — création (Phase I.0).
+   - `v1` — 2026-10-24 — Q-01, ADR-001 : le PATCH `200` ne route plus `REJECTED` ; un `400` métier persisté `REJECTED` (T4 / T6 / T10 / T12b) produit l'outcome `REJECTED`.
++  - `v1` — 2026-10-25 — Content-Type : `application/json` et `application/json; charset=UTF-8` (casse du charset indifférente), y compris le webhook. Rejet d'en-tête backend sur E1, E3 ou E8 (`ErrorResponse`, sans `errors[]`) routé en `500` `INTERNAL_ERROR`. Décision humaine, ADR-015.
+ 
+ ---
+ 
+--- git diff --no-index -- NUL docs/adr/ADR-015-content-type-post-patch.md ---
+git : warning: LF will be replaced by CRLF in docs/adr/ADR-015-content-type-post-patch.md.
+Au caractère Ligne:1 : 1347
++ ... --"); $d2 = git diff --no-index -- NUL docs/adr/ADR-015-content-type- ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: LF wil...-post-patch.md.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+The file will have its original line endings in your working directory
+diff --git a/docs/adr/ADR-015-content-type-post-patch.md b/docs/adr/ADR-015-content-type-post-patch.md
+new file mode 100644
+index 0000000..5871b79
+--- /dev/null
++++ b/docs/adr/ADR-015-content-type-post-patch.md
+@@ -0,0 +1,68 @@
++# ADR-015 — Content-Type des POST et PATCH à corps JSON
++
++| | |
++|---|---|
++| Question | Harmonisation Content-Type (lot L0c-CT) |
++| Statut | **ACCEPTÉ** |
++| Date | 2026-10-25 |
++| Périmètre | Itération 1 — documentation. Aucun code, test ou fixture modifié par ce lot. |
++| Hors numérotation | Ne remplace pas le tableau ADR-01…ADR-14 de `docs/architecture.md:117-132`. Ce fichier n'ajoute pas de ligne à ce tableau. |
++
++## Numérotation
++
++Deux listes existent. Elles partagent les entiers, elles ne partagent pas les sujets.
++
++Entiers déjà utilisés dans `docs/architecture.md:119-132` :
++
++| Entier | Emplacement | Sujet |
++|---|---|---|
++| 01 | `:119` | Langage / JDK |
++| 02 | `:120` | Framework |
++| 03 | `:121` | Base de données |
++| 04 | `:122` | Migrations |
++| 05 | `:123` | Génération DOCX |
++| 06 | `:124` | Architecture hexagonale |
++| 07 | `:125` | Sérialisation |
++| 08 | `:126` | Validation d'entrée |
++| 09 | `:127` | Tests |
++| 10 | `:128` | Schéma d'extraction |
++| 11 | `:129` | Stockage |
++| 12 | `:130` | Génération synchrone, `201` |
++| 13 | `:131` | Santé du service |
++| 14 | `:132` | Horloge |
++
++Entiers déjà utilisés comme fichiers dans `docs/adr/` : 001, 002, 003, 004, 005, 006, 007, 008, 009, 010, 011. Chaque fichier de cette série indique qu'il ne remplace pas le tableau d'architecture.
++
++Le prochain entier libre dans les deux listes est **15**. ADR-013 et ADR-014 sont déjà le tableau d'architecture (santé, horloge). Cet ADR est donc **ADR-015**. Il documente une décision de contrat. Il ne modifie pas `docs/architecture.md`.
++
++## Contexte
++
++`requirements/API_CONTRACTS.md` §1.1 n'acceptait qu'une valeur, `application/json; charset=UTF-8`, et limitait la règle aux POST. E3 est un PATCH. Les en-têtes de §3.1, §3.3 et §3.8 citaient `application/json` seul. Le `400` d'E8 était entièrement un `ExtractionValidationResponse`. Le tableau §4 mêlait ce `400` de schéma au `VALIDATION_ERROR`.
++
++`requirements/N8N_CONTRACTS.md` §1.1 (webhook) mirrorait l'ancienne valeur unique. Le §3.2 envoyait tout `400` E8 sans `ERR_DOCUMENT_TYPE_NON_SUPPORTE` vers `502` `EXTRACTION_SCHEMA_INVALID`, y compris un rejet d'en-tête au corps `ErrorResponse`.
++
++## Décision
++
++Décision humaine, 2026-10-25.
++
++Pour tout POST ou PATCH à corps JSON, les seules valeurs de `Content-Type` acceptées sont `application/json` et `application/json; charset=UTF-8` (casse du charset indifférente). En-tête absent ou toute autre valeur : `400` `VALIDATION_ERROR`, corps `ErrorResponse`, requête non traitée et non persistée.
++
++Exception de forme : sur `POST /api/v1/extraction/validate`, les `400` de schéma (JSON malformé, clé inconnue, type, enum, `documentType`, date) restent des `ExtractionValidationResponse`. Seul le rejet de l'en-tête est un `ErrorResponse`.
++
++Précision du même jour, routage n8n : un rejet d'en-tête (`ErrorResponse`, `VALIDATION_ERROR`, sans `errors[]`) sur E1, E3 ou E8 vient d'un défaut d'orchestration, parce que n8n envoie l'en-tête. n8n le route vers `500` `INTERNAL_ERROR`, comme les autres bugs d'orchestration, sans détail du corps backend. Il ne le route pas vers `400` `INVALID_REQUEST`. Le `400` de schéma d'E8 reste discriminé par `errors[]` : `ERR_DOCUMENT_TYPE_NON_SUPPORTE` → `200` `UNSUPPORTED_DOCUMENT_TYPE` ; tout autre contenu de `errors[]` → `502` `EXTRACTION_SCHEMA_INVALID`. Aucun outcome ni code nouveau.
++
++Le rejet d'en-tête à l'ingress du webhook reste un `400` `VALIDATION_ERROR` : c'est l'en-tête du client du webhook.
++
++## Conséquences
++
++| Zone | Effet |
++|---|---|
++| `requirements/API_CONTRACTS.md` | §1.1, en-têtes E1/E3/E8, `400` E1 et E3, deux `400` E8, tableau §4. Pas de section d'historique dans ce contrat : elle n'existait pas. |
++| `requirements/N8N_CONTRACTS.md` | §1.1 webhook, §3.2, §3.4, ligne d'historique §8 du 2026-10-25. |
++| Code E1/E3 | Aucun code modifié. E1 et E3 ne rejettent pas un charset autre que UTF-8. Écart connu jusqu'au lot A2. Constat antérieur : `docs/reports/LA-e8-content-type.md:90`. |
++| Workflow exporté et fixtures | Non vérifiés pour la règle du webhook §1.1. Écart connu, lot ultérieur. Ce lot ne les modifie pas. |
++| `docs/architecture.md` | Inchangé. ADR-12 du tableau reste la génération synchrone. |
++
++## Décision retenue
++
++Statut de cet ADR : **ACCEPTÉ**.
+--- git diff --no-index -- NUL docs/reports/L0c-CT.md ---
+git : warning: LF will be replaced by CRLF in docs/reports/L0c-CT.md.
+Au caractère Ligne:1 : 1608
++ ... --"); $d3 = git diff --no-index -- NUL docs/reports/L0c-CT.md 2>&1 |  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: LF wil...orts/L0c-CT.md.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+The file will have its original line endings in your working directory
+diff --git a/docs/reports/L0c-CT.md b/docs/reports/L0c-CT.md
+new file mode 100644
+index 0000000..62ac38d
+--- /dev/null
++++ b/docs/reports/L0c-CT.md
+@@ -0,0 +1,88 @@
++# L0c-CT — harmonisation du contrat Content-Type
++
++| | |
++|---|---|
++| Rôle | orchestrateur |
++| Date | 2026-10-25 |
++| Cycle | 1 / 3 |
++| Nature | Documentation uniquement. Aucun code, test, fixture, ni commit. |
++
++## STATUS
++
++Documentation écrite. Revues reviewer puis security : verdicts recopiés ci-dessous après contextes neufs. Les gates d'exécution ne sont pas lancés.
++
++## FINDINGS
++
++Décision humaine du 2026-10-25, appliquée.
++
++Pour tout POST ou PATCH à corps JSON, les seules valeurs de `Content-Type` acceptées sont `application/json` et `application/json; charset=UTF-8` (casse du charset indifférente). En-tête absent ou toute autre valeur : `400` `VALIDATION_ERROR`, corps `ErrorResponse`, requête non traitée et non persistée. Sur `POST /api/v1/extraction/validate`, le rejet d'en-tête est cet `ErrorResponse` ; le `400` de schéma reste un `ExtractionValidationResponse`.
++
++Précision du même jour : un rejet d'en-tête (`ErrorResponse`, `VALIDATION_ERROR`, sans `errors[]`) sur E1, E3 ou E8 est un défaut d'orchestration (n8n envoie l'en-tête). Il est routé vers `500` `INTERNAL_ERROR`, sans détail du corps backend. Le `400` de schéma d'E8 reste discriminé par `errors[]`. Aucun outcome ni code nouveau. L'ingress webhook, lui, reste un `400` `VALIDATION_ERROR` : c'est l'en-tête du client du webhook.
++
++Formulation écrite dans `requirements/N8N_CONTRACTS.md` :
++
++- `:174` — le `400` `INVALID_REQUEST` conserve l'ingress invalide, le `400` E1 sans `requestId` et le `400` E3 non persistant (clé inconnue ou réservée), **sauf** le rejet d'en-tête Content-Type, renvoyé vers `500` `INTERNAL_ERROR`.
++- `:178` — `EXTRACTION_SCHEMA_INVALID` vise le `400` E8 dont le corps est un `ExtractionValidationResponse` (`errors[]` présent) sans `ERR_DOCUMENT_TYPE_NON_SUPPORTE`.
++- `:180` — le `500` `INTERNAL_ERROR` inclut ce rejet d'en-tête sur E1, E3 ou E8, sans détail du corps backend.
++- `:182-191` — discrimination : `errors[]` présent → `200` `UNSUPPORTED_DOCUMENT_TYPE` ou `502` `EXTRACTION_SCHEMA_INVALID` ; corps `ErrorResponse` sans `errors[]` → `500` `INTERNAL_ERROR`.
++- `:362`, `:364`, `:366` — le tableau §3.4 reprend le même partage, pour ne pas laisser « tout E1 `400` non persistant » et « tout E8 `400` détaillé » contredire §3.2.
++
++Numéros d'ADR déjà pris :
++
++- `docs/architecture.md:119-132` : ADR-01 à ADR-14. ADR-12 (`:130`) est la génération synchrone. ADR-13 (`:131`) est la santé. ADR-14 (`:132`) est l'horloge.
++- `docs/adr/` : ADR-001 à ADR-011.
++
++Le suivant est **ADR-015**. Il explique cet écart avec le tableau d'architecture et ne modifie pas `docs/architecture.md`.
++
++`requirements/API_CONTRACTS.md` n'a pas de section d'historique. Aucune n'a été créée. `requirements/N8N_CONTRACTS.md` §8 a une ligne au 2026-10-25.
++
++### Écarts connus, non corrigés dans ce lot
++
++1. **E1 et E3, charset autre que UTF-8.** Le contrat exige désormais le rejet. Le code d'E1 et d'E3 ne le fait pas. Ils ne sont pas conformes tant que le lot A2 n'est pas fait. Constat antérieur : `docs/reports/LA-e8-content-type.md:90`. Aucun code touché.
++2. **Webhook §1.1.** `requirements/N8N_CONTRACTS.md:30` est aligné sur les deux valeurs acceptées et sur l'en-tête absent. Le workflow exporté et les fixtures ne sont pas vérifiés pour cette règle. Écart connu, lot ultérieur. Aucune fixture touchée.
++
++## FILES_CHANGED
++
++- `requirements/API_CONTRACTS.md` — §1.1, en-têtes E1/E3/E8, `400` E1, ligne `400` d'en-tête E3, deux `400` E8, tableau §4 et phrase des familles n8n.
++- `requirements/N8N_CONTRACTS.md` — §1.1 webhook, §3.2, §3.4, historique §8.
++- `docs/adr/ADR-015-content-type-post-patch.md` — créé, statut ACCEPTÉ, décision humaine du 2026-10-25.
++- `docs/reports/L0c-CT.md` — ce rapport.
++- `docs/reports/evidence/LCT-diff.txt` — diff capturé par le testeur.
++
++Non modifiés : code, tests, fixtures, workflows exportés, `docs/adr/ADR-001-e3-regle-metier-400.md`, `docs/reports/LA-e8-content-type.md`, `docs/architecture.md`.
++
++## TESTS
++
++NOT_RUN
++
++Aucun test, aucune fixture, aucun runtime n8n.
++
++| Gate | Statut |
++|---|---|
++| G0 inventaire | NOT_RUN |
++| G1 build + unitaires | NOT_RUN |
++| G2 persistance | NOT_RUN |
++| G3 DOCX | NOT_RUN |
++| G4 HTTP E2E | NOT_RUN |
++| G5 fixtures | NOT_RUN |
++| G6 n8n runtime | NOT_RUN |
++| G7 revue sécurité de ce lot | NOT_RUN |
++| G8 CI | NOT_RUN |
++
++## RISKS
++
++- E1/E3 acceptent encore un charset autre que UTF-8 jusqu'au lot A2. Le contrat est en avance sur le code.
++- Le workflow exporté et les fixtures peuvent encore n'envoyer ou n'accepter qu'une seule valeur de `Content-Type`. Non vérifié ici.
++- Un `400` E1 sans `requestId` qui n'est pas un rejet d'en-tête (enveloppe invalide) reste `400` `INVALID_REQUEST`. Le partage repose sur la cause « rejet d'en-tête », pas sur l'absence seule de `errors[]` pour E1 et E3.
++
++## NEXT_ACTION
++
++Lot A2 : rejeter sur E1 et E3 un charset autre que UTF-8, avec tests. Lot ultérieur séparé : vérifier le workflow exporté et les fixtures contre `N8N_CONTRACTS.md` §1.1. Pas de commit dans ce lot.
++
++## REVUES
++
++Verdicts recopiés après contextes neufs. Première ligne exigée : `VERDICT:`.
++
++Reviewer : en attente.
++
++Security : en attente.
