@@ -214,7 +214,7 @@ class ExtractionControllerTest {
                 .andExpect(jsonPath("$.correlationId").isNotEmpty())
                 .andExpect(jsonPath("$.missingFields").isArray())
                 .andExpect(jsonPath("$.valid").doesNotExist())
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("payload"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("Content-Type"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"));
     }
 

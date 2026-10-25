@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
@@ -58,9 +59,11 @@ public class DocumentRequestController {
         this.objectMapper = objectMapper;
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> create(@Valid @RequestBody CreateRequestRequest body,
-                                    HttpServletRequest http) {
+                                    HttpServletRequest http)
+            throws HttpMediaTypeNotSupportedException {
+        rejectNonUtf8Charset(http);
         String correlationId = CorrelationIdFilter.currentCorrelationId(http);
         DocumentRequest request = requestService.create(
                 body.getDocumentType(),
@@ -78,10 +81,12 @@ public class DocumentRequestController {
         return ResponseEntity.ok(mapper.toStatusResponse(request));
     }
 
-    @PatchMapping("/{requestId}")
+    @PatchMapping(value = "/{requestId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> patch(@PathVariable UUID requestId,
                                    @RequestBody PatchRequestRequest body,
-                                   HttpServletRequest http) {
+                                   HttpServletRequest http)
+            throws HttpMediaTypeNotSupportedException {
+        rejectNonUtf8Charset(http);
         DocumentRequest request = requestService.patch(requestId, mergedPatch(body));
         String correlationId = CorrelationIdFilter.currentCorrelationId(http);
         if (request.getStatus() == RequestStatus.REJECTED) {
@@ -142,6 +147,26 @@ public class DocumentRequestController {
     private ErrorResponse errorBody(ErrorCode code, String correlationId) {
         return new ErrorResponse(code.name(), code.getMessage(), correlationId,
                 List.of(), null, null, List.of(), null);
+    }
+
+    /**
+     * {@code consumes = application/json} laisse passer tout charset.
+     * Même garde que {@code ExtractionController} : seul UTF-8, ou l'absence
+     * de charset, est accepté. Le message d'erreur reste celui du handler
+     * partagé et ne reprend pas la valeur d'en-tête.
+     */
+    private static void rejectNonUtf8Charset(HttpServletRequest http)
+            throws HttpMediaTypeNotSupportedException {
+        String raw = http.getContentType();
+        if (raw == null || raw.isBlank()) {
+            return;
+        }
+        MediaType mediaType = MediaType.parseMediaType(raw);
+        String charset = mediaType.getParameter("charset");
+        if (charset != null && !"UTF-8".equalsIgnoreCase(charset)) {
+            throw new HttpMediaTypeNotSupportedException(
+                    mediaType, List.of(MediaType.APPLICATION_JSON));
+        }
     }
 
     private Map<String, Object> mergedPatch(PatchRequestRequest body) {

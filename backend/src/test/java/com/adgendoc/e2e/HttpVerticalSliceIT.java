@@ -407,13 +407,14 @@ class HttpVerticalSliceIT {
         long before = queryLong("SELECT count(*) FROM document_request");
         HttpResponse<byte[]> response = send("POST", API, "text/plain",
                 completeBody());
-        // Contrat : Content-Type non supporté ⇒ 400 VALIDATION_ERROR / payload.
+        // Option A (lot A2) : Content-Type non supporté ⇒ 400 VALIDATION_ERROR,
+        // fieldErrors[0].field = Content-Type. Non exécuté dans ce lot (PostgreSQL).
         assertThat(response.statusCode()).isEqualTo(400);
         JsonNode json = body(response);
         assertThat(json.path("code").asText()).isEqualTo("VALIDATION_ERROR");
         assertThat(json.path("fieldErrors")).hasSize(1);
         assertThat(json.path("fieldErrors").get(0).path("field").asText())
-                .isEqualTo("payload");
+                .isEqualTo("Content-Type");
         assertThat(queryLong("SELECT count(*) FROM document_request")).isEqualTo(before);
     }
 

@@ -1,0 +1,410 @@
+﻿warning: LF will be replaced by CRLF in backend/src/main/java/com/adgendoc/api/DocumentRequestController.java.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in backend/src/main/java/com/adgendoc/api/GlobalExceptionHandler.java.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java.
+The file will have its original line endings in your working directory
+diff --git a/backend/src/main/java/com/adgendoc/api/DocumentRequestController.java b/backend/src/main/java/com/adgendoc/api/DocumentRequestController.java
+index ea6af21..40fd9d0 100644
+--- a/backend/src/main/java/com/adgendoc/api/DocumentRequestController.java
++++ b/backend/src/main/java/com/adgendoc/api/DocumentRequestController.java
+@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestBody;
+ import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.HttpMediaTypeNotSupportedException;
+ import org.springframework.web.bind.annotation.RestController;
+ 
+ import java.util.LinkedHashMap;
+@@ -58,9 +59,11 @@ public class DocumentRequestController {
+         this.objectMapper = objectMapper;
+     }
+ 
+-    @PostMapping
++    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+     public ResponseEntity<?> create(@Valid @RequestBody CreateRequestRequest body,
+-                                    HttpServletRequest http) {
++                                    HttpServletRequest http)
++            throws HttpMediaTypeNotSupportedException {
++        rejectNonUtf8Charset(http);
+         String correlationId = CorrelationIdFilter.currentCorrelationId(http);
+         DocumentRequest request = requestService.create(
+                 body.getDocumentType(),
+@@ -78,10 +81,12 @@ public class DocumentRequestController {
+         return ResponseEntity.ok(mapper.toStatusResponse(request));
+     }
+ 
+-    @PatchMapping("/{requestId}")
++    @PatchMapping(value = "/{requestId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+     public ResponseEntity<?> patch(@PathVariable UUID requestId,
+                                    @RequestBody PatchRequestRequest body,
+-                                   HttpServletRequest http) {
++                                   HttpServletRequest http)
++            throws HttpMediaTypeNotSupportedException {
++        rejectNonUtf8Charset(http);
+         DocumentRequest request = requestService.patch(requestId, mergedPatch(body));
+         String correlationId = CorrelationIdFilter.currentCorrelationId(http);
+         if (request.getStatus() == RequestStatus.REJECTED) {
+@@ -144,6 +149,26 @@ public class DocumentRequestController {
+                 List.of(), null, null, List.of(), null);
+     }
+ 
++    /**
++     * {@code consumes = application/json} laisse passer tout charset.
++     * Même garde que {@code ExtractionController} : seul UTF-8, ou l'absence
++     * de charset, est accepté. Le message d'erreur reste celui du handler
++     * partagé et ne reprend pas la valeur d'en-tête.
++     */
++    private static void rejectNonUtf8Charset(HttpServletRequest http)
++            throws HttpMediaTypeNotSupportedException {
++        String raw = http.getContentType();
++        if (raw == null || raw.isBlank()) {
++            return;
++        }
++        MediaType mediaType = MediaType.parseMediaType(raw);
++        String charset = mediaType.getParameter("charset");
++        if (charset != null && !"UTF-8".equalsIgnoreCase(charset)) {
++            throw new HttpMediaTypeNotSupportedException(
++                    mediaType, List.of(MediaType.APPLICATION_JSON));
++        }
++    }
++
+     private Map<String, Object> mergedPatch(PatchRequestRequest body) {
+         Map<String, Object> merged = new LinkedHashMap<>();
+         toObjectMap(body.getFlatFields()).forEach(merged::put);
+diff --git a/backend/src/main/java/com/adgendoc/api/GlobalExceptionHandler.java b/backend/src/main/java/com/adgendoc/api/GlobalExceptionHandler.java
+index 77e07e8..cdfe334 100644
+--- a/backend/src/main/java/com/adgendoc/api/GlobalExceptionHandler.java
++++ b/backend/src/main/java/com/adgendoc/api/GlobalExceptionHandler.java
+@@ -46,6 +46,7 @@ public class GlobalExceptionHandler {
+     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+ 
+     private static final String PAYLOAD_FIELD = "payload";
++    private static final String CONTENT_TYPE_FIELD = "Content-Type";
+ 
+     private final RequestService requestService;
+ 
+@@ -130,7 +131,7 @@ public class GlobalExceptionHandler {
+             HttpMediaTypeNotSupportedException exception, HttpServletRequest http) {
+         return respond(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR,
+                 ErrorCode.VALIDATION_ERROR.getMessage(), http, null, null,
+-                List.of(payloadFieldError()));
++                List.of(contentTypeFieldError()));
+     }
+ 
+     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+@@ -259,6 +260,11 @@ public class GlobalExceptionHandler {
+         return ErrorResponse.FieldError.of(PAYLOAD_FIELD, code, code.getMessage());
+     }
+ 
++    private ErrorResponse.FieldError contentTypeFieldError() {
++        ErrorCode code = ErrorCode.ERR_PAYLOAD_INVALIDE;
++        return ErrorResponse.FieldError.of(CONTENT_TYPE_FIELD, code, code.getMessage());
++    }
++
+     private String correlationId(HttpServletRequest http) {
+         return CorrelationIdFilter.currentCorrelationId(http);
+     }
+diff --git a/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java b/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
+index 64e5a2c..38abf45 100644
+--- a/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
++++ b/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
+@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
+ import org.springframework.http.MediaType;
+ import org.springframework.mock.web.MockHttpServletResponse;
+ import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+ 
+@@ -43,6 +44,8 @@ import java.util.logging.Logger;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.hamcrest.Matchers.containsString;
++import static org.mockito.Mockito.spy;
++import static org.mockito.Mockito.verifyNoInteractions;
+ import static org.hamcrest.Matchers.matchesPattern;
+ import static org.hamcrest.Matchers.not;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+@@ -65,6 +68,8 @@ class DocumentRequestControllerTest {
+     private static final String DOCX_MIME_TYPE =
+             "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+     private static final long MAX_PAYLOAD_BYTES = 65536;
++    private static final String CONTENT_TYPE_FIELD_MESSAGE =
++            "Corps de requête invalide ou JSON malformé.";
+ 
+     private final InMemoryRequestRepository requestRepository = new InMemoryRequestRepository();
+     private final RecordingAuditPort auditPort = new RecordingAuditPort();
+@@ -307,6 +312,86 @@ class DocumentRequestControllerTest {
+         assertThat(requestRepository.saveCount).isZero();
+     }
+ 
++    @Test
++    void e1_text_plain_content_type_is_rejected_without_calling_service() throws Exception {
++        expectE1ContentTypeRejected(post("/api/v1/requests")
++                .contentType(MediaType.TEXT_PLAIN)
++                .content(validBody()), "text/plain");
++    }
++
++    @Test
++    void e1_form_urlencoded_content_type_is_rejected_without_calling_service() throws Exception {
++        expectE1ContentTypeRejected(post("/api/v1/requests")
++                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
++                .content(validBody()), "application/x-www-form-urlencoded");
++    }
++
++    @Test
++    void e1_missing_content_type_is_rejected_without_calling_service() throws Exception {
++        expectE1ContentTypeRejected(post("/api/v1/requests")
++                .content(validBody()), null);
++    }
++
++    @Test
++    void e1_json_charset_iso_8859_1_is_rejected_without_calling_service() throws Exception {
++        expectE1ContentTypeRejected(post("/api/v1/requests")
++                .contentType("application/json; charset=ISO-8859-1")
++                .content(validBody()), "ISO-8859-1");
++    }
++
++    @Test
++    void e1_json_without_charset_is_not_a_content_type_rejection() throws Exception {
++        mockMvc.perform(post("/api/v1/requests")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(validBody()))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.code").doesNotExist())
++                .andExpect(jsonPath("$.status").value("VALIDATED"));
++    }
++
++    @Test
++    void e1_json_charset_utf8_is_not_a_content_type_rejection() throws Exception {
++        mockMvc.perform(post("/api/v1/requests")
++                        .contentType("application/json; charset=UTF-8")
++                        .content(validBody()))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.code").doesNotExist())
++                .andExpect(jsonPath("$.status").value("VALIDATED"));
++    }
++
++    @Test
++    void e1_json_charset_utf8_lowercase_is_not_a_content_type_rejection() throws Exception {
++        mockMvc.perform(post("/api/v1/requests")
++                        .contentType("application/json; charset=utf-8")
++                        .content(validBody()))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.code").doesNotExist())
++                .andExpect(jsonPath("$.status").value("VALIDATED"));
++    }
++
++    @Test
++    void e1_content_type_rejection_is_distinguishable_from_malformed_json() throws Exception {
++        mockMvc.perform(post("/api/v1/requests")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"documentType\":\"ATTESTATION_CONCORDANCE\",\"data\":{"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
++                .andExpect(jsonPath("$.fieldErrors[0].field").value("payload"))
++                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
++                .andExpect(jsonPath("$.requestId").doesNotExist());
++
++        mockMvc.perform(post("/api/v1/requests")
++                        .contentType(MediaType.TEXT_PLAIN)
++                        .content(validBody()))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
++                .andExpect(jsonPath("$.fieldErrors[0].field").value("Content-Type"))
++                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
++                .andExpect(jsonPath("$.requestId").doesNotExist());
++
++        assertThat(requestRepository.saveCount).isZero();
++    }
++
+     @Test
+     void e1_oversized_payload_returns_413() throws Exception {
+         mockMvc.perform(post("/api/v1/requests")
+@@ -497,6 +582,70 @@ class DocumentRequestControllerTest {
+                 .andExpect(jsonPath("$.code").value("REQUEST_NOT_FOUND"));
+     }
+ 
++    @Test
++    void e3_text_plain_content_type_is_rejected_without_calling_service() throws Exception {
++        UUID requestId = createMissingRequest();
++        expectE3ContentTypeRejected(requestId, patch("/api/v1/requests/" + requestId)
++                .contentType(MediaType.TEXT_PLAIN)
++                .content("{\"lieuNaissance\":\"Bissau\"}"), "text/plain");
++    }
++
++    @Test
++    void e3_form_urlencoded_content_type_is_rejected_without_calling_service() throws Exception {
++        UUID requestId = createMissingRequest();
++        expectE3ContentTypeRejected(requestId, patch("/api/v1/requests/" + requestId)
++                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
++                .content("lieuNaissance=Bissau"), "application/x-www-form-urlencoded");
++    }
++
++    @Test
++    void e3_missing_content_type_is_rejected_without_calling_service() throws Exception {
++        UUID requestId = createMissingRequest();
++        expectE3ContentTypeRejected(requestId, patch("/api/v1/requests/" + requestId)
++                .content("{\"lieuNaissance\":\"Bissau\"}"), null);
++    }
++
++    @Test
++    void e3_json_charset_iso_8859_1_is_rejected_without_calling_service() throws Exception {
++        UUID requestId = createMissingRequest();
++        expectE3ContentTypeRejected(requestId, patch("/api/v1/requests/" + requestId)
++                .contentType("application/json; charset=ISO-8859-1")
++                .content("{\"lieuNaissance\":\"Bissau\"}"), "ISO-8859-1");
++    }
++
++    @Test
++    void e3_json_without_charset_is_not_a_content_type_rejection() throws Exception {
++        UUID requestId = createMissingRequest();
++        mockMvc.perform(patch("/api/v1/requests/" + requestId)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"dateNaissance\":\"1985-05-12\"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").doesNotExist())
++                .andExpect(jsonPath("$.status").value("MISSING_INFORMATION"));
++    }
++
++    @Test
++    void e3_json_charset_utf8_is_not_a_content_type_rejection() throws Exception {
++        UUID requestId = createMissingRequest();
++        mockMvc.perform(patch("/api/v1/requests/" + requestId)
++                        .contentType("application/json; charset=UTF-8")
++                        .content("{\"dateNaissance\":\"1985-05-12\"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").doesNotExist())
++                .andExpect(jsonPath("$.status").value("MISSING_INFORMATION"));
++    }
++
++    @Test
++    void e3_json_charset_utf8_lowercase_is_not_a_content_type_rejection() throws Exception {
++        UUID requestId = createMissingRequest();
++        mockMvc.perform(patch("/api/v1/requests/" + requestId)
++                        .contentType("application/json; charset=utf-8")
++                        .content("{\"dateNaissance\":\"1985-05-12\"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.code").doesNotExist())
++                .andExpect(jsonPath("$.status").value("MISSING_INFORMATION"));
++    }
++
+     // ------------------------------------------------------------------
+     // E4 — POST /api/v1/requests/{requestId}/validate
+     // ------------------------------------------------------------------
+@@ -701,6 +850,69 @@ class DocumentRequestControllerTest {
+     // Helpers
+     // ------------------------------------------------------------------
+ 
++    private void expectE1ContentTypeRejected(MockHttpServletRequestBuilder request,
++                                            String clientControlledToken) throws Exception {
++        int savesBefore = requestRepository.saveCount;
++        RequestService spyService = spy(requestService);
++        var result = mockMvcFor(spyService).perform(withCorrelation(request));
++        result.andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
++                .andExpect(jsonPath("$.message").value("Données invalides : correction nécessaire."))
++                .andExpect(jsonPath("$.correlationId").value("lot-a2-content-type"))
++                .andExpect(jsonPath("$.requestId").doesNotExist())
++                .andExpect(jsonPath("$.status").doesNotExist())
++                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
++                .andExpect(jsonPath("$.fieldErrors[0].field").value("Content-Type"))
++                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
++                .andExpect(jsonPath("$.fieldErrors[0].message").value(CONTENT_TYPE_FIELD_MESSAGE));
++        if (clientControlledToken != null) {
++            result.andExpect(content().string(not(containsString(clientControlledToken))));
++        }
++        verifyNoInteractions(spyService);
++        assertThat(requestRepository.saveCount).isEqualTo(savesBefore);
++    }
++
++    private void expectE3ContentTypeRejected(UUID requestId, MockHttpServletRequestBuilder request,
++                                            String clientControlledToken) throws Exception {
++        int savesBefore = requestRepository.saveCount;
++        RequestStatus statusBefore = requestRepository.store.get(requestId).getStatus();
++        Map<String, Object> dataBefore = new LinkedHashMap<>(
++                requestRepository.store.get(requestId).getData());
++        RequestService spyService = spy(requestService);
++        var result = mockMvcFor(spyService).perform(withCorrelation(request));
++        result.andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
++                .andExpect(jsonPath("$.message").value("Données invalides : correction nécessaire."))
++                .andExpect(jsonPath("$.correlationId").value("lot-a2-content-type"))
++                .andExpect(jsonPath("$.requestId").doesNotExist())
++                .andExpect(jsonPath("$.status").doesNotExist())
++                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
++                .andExpect(jsonPath("$.fieldErrors[0].field").value("Content-Type"))
++                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
++                .andExpect(jsonPath("$.fieldErrors[0].message").value(CONTENT_TYPE_FIELD_MESSAGE));
++        if (clientControlledToken != null) {
++            result.andExpect(content().string(not(containsString(clientControlledToken))));
++        }
++        verifyNoInteractions(spyService);
++        assertThat(requestRepository.saveCount).isEqualTo(savesBefore);
++        DocumentRequest stored = requestRepository.store.get(requestId);
++        assertThat(stored.getStatus()).isEqualTo(statusBefore);
++        assertThat(stored.getData()).isEqualTo(dataBefore);
++    }
++
++    private static MockHttpServletRequestBuilder withCorrelation(MockHttpServletRequestBuilder request) {
++        return request.header("X-Correlation-Id", "lot-a2-content-type");
++    }
++
++    private MockMvc mockMvcFor(RequestService service) {
++        ValidationService validationService = new ValidationService(CLOCK);
++        RequestResponseMapper mapper =
++                new RequestResponseMapper(validationService, documentGenerationService);
++        DocumentRequestController controller = new DocumentRequestController(
++                service, documentGenerationService, mapper, objectMapper);
++        return buildMockMvc(controller, service, null);
++    }
++
+     private String validBody() {
+         return """
+                 {"documentType":"ATTESTATION_CONCORDANCE",
+diff --git a/backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java b/backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
+index 3a70540..fb838eb 100644
+--- a/backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
++++ b/backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
+@@ -214,7 +214,7 @@ class ExtractionControllerTest {
+                 .andExpect(jsonPath("$.correlationId").isNotEmpty())
+                 .andExpect(jsonPath("$.missingFields").isArray())
+                 .andExpect(jsonPath("$.valid").doesNotExist())
+-                .andExpect(jsonPath("$.fieldErrors[0].field").value("payload"))
++                .andExpect(jsonPath("$.fieldErrors[0].field").value("Content-Type"))
+                 .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"));
+     }
+ 
+diff --git a/backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java b/backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
+index 00f8fd8..2f4fadb 100644
+--- a/backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
++++ b/backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
+@@ -407,13 +407,14 @@ class HttpVerticalSliceIT {
+         long before = queryLong("SELECT count(*) FROM document_request");
+         HttpResponse<byte[]> response = send("POST", API, "text/plain",
+                 completeBody());
+-        // Contrat : Content-Type non supporté ⇒ 400 VALIDATION_ERROR / payload.
++        // Option A (lot A2) : Content-Type non supporté ⇒ 400 VALIDATION_ERROR,
++        // fieldErrors[0].field = Content-Type. Non exécuté dans ce lot (PostgreSQL).
+         assertThat(response.statusCode()).isEqualTo(400);
+         JsonNode json = body(response);
+         assertThat(json.path("code").asText()).isEqualTo("VALIDATION_ERROR");
+         assertThat(json.path("fieldErrors")).hasSize(1);
+         assertThat(json.path("fieldErrors").get(0).path("field").asText())
+-                .isEqualTo("payload");
++                .isEqualTo("Content-Type");
+         assertThat(queryLong("SELECT count(*) FROM document_request")).isEqualTo(before);
+     }
+ 
+ M backend/src/main/java/com/adgendoc/api/DocumentRequestController.java
+ M backend/src/main/java/com/adgendoc/api/GlobalExceptionHandler.java
+ M backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
+ M backend/src/test/java/com/adgendoc/api/ExtractionControllerTest.java
+ M backend/src/test/java/com/adgendoc/e2e/HttpVerticalSliceIT.java
+?? docs/reports/evidence/LA2-before.txt
+?? docs/reports/evidence/LA2-lot.txt

@@ -46,6 +46,7 @@ public class GlobalExceptionHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private static final String PAYLOAD_FIELD = "payload";
+    private static final String CONTENT_TYPE_FIELD = "Content-Type";
 
     private final RequestService requestService;
 
@@ -130,7 +131,7 @@ public class GlobalExceptionHandler {
             HttpMediaTypeNotSupportedException exception, HttpServletRequest http) {
         return respond(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR,
                 ErrorCode.VALIDATION_ERROR.getMessage(), http, null, null,
-                List.of(payloadFieldError()));
+                List.of(contentTypeFieldError()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -257,6 +258,11 @@ public class GlobalExceptionHandler {
     private ErrorResponse.FieldError payloadFieldError() {
         ErrorCode code = ErrorCode.ERR_PAYLOAD_INVALIDE;
         return ErrorResponse.FieldError.of(PAYLOAD_FIELD, code, code.getMessage());
+    }
+
+    private ErrorResponse.FieldError contentTypeFieldError() {
+        ErrorCode code = ErrorCode.ERR_PAYLOAD_INVALIDE;
+        return ErrorResponse.FieldError.of(CONTENT_TYPE_FIELD, code, code.getMessage());
     }
 
     private String correlationId(HttpServletRequest http) {

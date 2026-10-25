@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
@@ -43,6 +44,8 @@ import java.util.logging.Logger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -65,6 +68,8 @@ class DocumentRequestControllerTest {
     private static final String DOCX_MIME_TYPE =
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     private static final long MAX_PAYLOAD_BYTES = 65536;
+    private static final String CONTENT_TYPE_FIELD_MESSAGE =
+            "Corps de requête invalide ou JSON malformé.";
 
     private final InMemoryRequestRepository requestRepository = new InMemoryRequestRepository();
     private final RecordingAuditPort auditPort = new RecordingAuditPort();
@@ -308,6 +313,86 @@ class DocumentRequestControllerTest {
     }
 
     @Test
+    void e1_text_plain_content_type_is_rejected_without_calling_service() throws Exception {
+        expectE1ContentTypeRejected(post("/api/v1/requests")
+                .contentType(MediaType.TEXT_PLAIN)
+                .content(validBody()), "text/plain");
+    }
+
+    @Test
+    void e1_form_urlencoded_content_type_is_rejected_without_calling_service() throws Exception {
+        expectE1ContentTypeRejected(post("/api/v1/requests")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .content(validBody()), "application/x-www-form-urlencoded");
+    }
+
+    @Test
+    void e1_missing_content_type_is_rejected_without_calling_service() throws Exception {
+        expectE1ContentTypeRejected(post("/api/v1/requests")
+                .content(validBody()), null);
+    }
+
+    @Test
+    void e1_json_charset_iso_8859_1_is_rejected_without_calling_service() throws Exception {
+        expectE1ContentTypeRejected(post("/api/v1/requests")
+                .contentType("application/json; charset=ISO-8859-1")
+                .content(validBody()), "ISO-8859-1");
+    }
+
+    @Test
+    void e1_json_without_charset_is_not_a_content_type_rejection() throws Exception {
+        mockMvc.perform(post("/api/v1/requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").doesNotExist())
+                .andExpect(jsonPath("$.status").value("VALIDATED"));
+    }
+
+    @Test
+    void e1_json_charset_utf8_is_not_a_content_type_rejection() throws Exception {
+        mockMvc.perform(post("/api/v1/requests")
+                        .contentType("application/json; charset=UTF-8")
+                        .content(validBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").doesNotExist())
+                .andExpect(jsonPath("$.status").value("VALIDATED"));
+    }
+
+    @Test
+    void e1_json_charset_utf8_lowercase_is_not_a_content_type_rejection() throws Exception {
+        mockMvc.perform(post("/api/v1/requests")
+                        .contentType("application/json; charset=utf-8")
+                        .content(validBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").doesNotExist())
+                .andExpect(jsonPath("$.status").value("VALIDATED"));
+    }
+
+    @Test
+    void e1_content_type_rejection_is_distinguishable_from_malformed_json() throws Exception {
+        mockMvc.perform(post("/api/v1/requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"documentType\":\"ATTESTATION_CONCORDANCE\",\"data\":{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("payload"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
+                .andExpect(jsonPath("$.requestId").doesNotExist());
+
+        mockMvc.perform(post("/api/v1/requests")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content(validBody()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("Content-Type"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
+                .andExpect(jsonPath("$.requestId").doesNotExist());
+
+        assertThat(requestRepository.saveCount).isZero();
+    }
+
+    @Test
     void e1_oversized_payload_returns_413() throws Exception {
         mockMvc.perform(post("/api/v1/requests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -495,6 +580,70 @@ class DocumentRequestControllerTest {
                         .content("{\"lieuNaissance\":\"Bissau\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("REQUEST_NOT_FOUND"));
+    }
+
+    @Test
+    void e3_text_plain_content_type_is_rejected_without_calling_service() throws Exception {
+        UUID requestId = createMissingRequest();
+        expectE3ContentTypeRejected(requestId, patch("/api/v1/requests/" + requestId)
+                .contentType(MediaType.TEXT_PLAIN)
+                .content("{\"lieuNaissance\":\"Bissau\"}"), "text/plain");
+    }
+
+    @Test
+    void e3_form_urlencoded_content_type_is_rejected_without_calling_service() throws Exception {
+        UUID requestId = createMissingRequest();
+        expectE3ContentTypeRejected(requestId, patch("/api/v1/requests/" + requestId)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .content("lieuNaissance=Bissau"), "application/x-www-form-urlencoded");
+    }
+
+    @Test
+    void e3_missing_content_type_is_rejected_without_calling_service() throws Exception {
+        UUID requestId = createMissingRequest();
+        expectE3ContentTypeRejected(requestId, patch("/api/v1/requests/" + requestId)
+                .content("{\"lieuNaissance\":\"Bissau\"}"), null);
+    }
+
+    @Test
+    void e3_json_charset_iso_8859_1_is_rejected_without_calling_service() throws Exception {
+        UUID requestId = createMissingRequest();
+        expectE3ContentTypeRejected(requestId, patch("/api/v1/requests/" + requestId)
+                .contentType("application/json; charset=ISO-8859-1")
+                .content("{\"lieuNaissance\":\"Bissau\"}"), "ISO-8859-1");
+    }
+
+    @Test
+    void e3_json_without_charset_is_not_a_content_type_rejection() throws Exception {
+        UUID requestId = createMissingRequest();
+        mockMvc.perform(patch("/api/v1/requests/" + requestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dateNaissance\":\"1985-05-12\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").doesNotExist())
+                .andExpect(jsonPath("$.status").value("MISSING_INFORMATION"));
+    }
+
+    @Test
+    void e3_json_charset_utf8_is_not_a_content_type_rejection() throws Exception {
+        UUID requestId = createMissingRequest();
+        mockMvc.perform(patch("/api/v1/requests/" + requestId)
+                        .contentType("application/json; charset=UTF-8")
+                        .content("{\"dateNaissance\":\"1985-05-12\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").doesNotExist())
+                .andExpect(jsonPath("$.status").value("MISSING_INFORMATION"));
+    }
+
+    @Test
+    void e3_json_charset_utf8_lowercase_is_not_a_content_type_rejection() throws Exception {
+        UUID requestId = createMissingRequest();
+        mockMvc.perform(patch("/api/v1/requests/" + requestId)
+                        .contentType("application/json; charset=utf-8")
+                        .content("{\"dateNaissance\":\"1985-05-12\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").doesNotExist())
+                .andExpect(jsonPath("$.status").value("MISSING_INFORMATION"));
     }
 
     // ------------------------------------------------------------------
@@ -700,6 +849,69 @@ class DocumentRequestControllerTest {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    private void expectE1ContentTypeRejected(MockHttpServletRequestBuilder request,
+                                            String clientControlledToken) throws Exception {
+        int savesBefore = requestRepository.saveCount;
+        RequestService spyService = spy(requestService);
+        var result = mockMvcFor(spyService).perform(withCorrelation(request));
+        result.andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Données invalides : correction nécessaire."))
+                .andExpect(jsonPath("$.correlationId").value("lot-a2-content-type"))
+                .andExpect(jsonPath("$.requestId").doesNotExist())
+                .andExpect(jsonPath("$.status").doesNotExist())
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("Content-Type"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value(CONTENT_TYPE_FIELD_MESSAGE));
+        if (clientControlledToken != null) {
+            result.andExpect(content().string(not(containsString(clientControlledToken))));
+        }
+        verifyNoInteractions(spyService);
+        assertThat(requestRepository.saveCount).isEqualTo(savesBefore);
+    }
+
+    private void expectE3ContentTypeRejected(UUID requestId, MockHttpServletRequestBuilder request,
+                                            String clientControlledToken) throws Exception {
+        int savesBefore = requestRepository.saveCount;
+        RequestStatus statusBefore = requestRepository.store.get(requestId).getStatus();
+        Map<String, Object> dataBefore = new LinkedHashMap<>(
+                requestRepository.store.get(requestId).getData());
+        RequestService spyService = spy(requestService);
+        var result = mockMvcFor(spyService).perform(withCorrelation(request));
+        result.andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Données invalides : correction nécessaire."))
+                .andExpect(jsonPath("$.correlationId").value("lot-a2-content-type"))
+                .andExpect(jsonPath("$.requestId").doesNotExist())
+                .andExpect(jsonPath("$.status").doesNotExist())
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("Content-Type"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value(CONTENT_TYPE_FIELD_MESSAGE));
+        if (clientControlledToken != null) {
+            result.andExpect(content().string(not(containsString(clientControlledToken))));
+        }
+        verifyNoInteractions(spyService);
+        assertThat(requestRepository.saveCount).isEqualTo(savesBefore);
+        DocumentRequest stored = requestRepository.store.get(requestId);
+        assertThat(stored.getStatus()).isEqualTo(statusBefore);
+        assertThat(stored.getData()).isEqualTo(dataBefore);
+    }
+
+    private static MockHttpServletRequestBuilder withCorrelation(MockHttpServletRequestBuilder request) {
+        return request.header("X-Correlation-Id", "lot-a2-content-type");
+    }
+
+    private MockMvc mockMvcFor(RequestService service) {
+        ValidationService validationService = new ValidationService(CLOCK);
+        RequestResponseMapper mapper =
+                new RequestResponseMapper(validationService, documentGenerationService);
+        DocumentRequestController controller = new DocumentRequestController(
+                service, documentGenerationService, mapper, objectMapper);
+        return buildMockMvc(controller, service, null);
+    }
 
     private String validBody() {
         return """
