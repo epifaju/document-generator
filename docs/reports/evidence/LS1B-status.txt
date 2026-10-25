@@ -1,0 +1,67 @@
+command: git status --short
+note: index LS1b = 3 renames (R) + 23 deletions (D). Hors lot : .gitignore modifié non indexé ; rapports non suivis. L'archive tar n'est pas dans l'index des suppressions.
+tar_tracked: n8n/backups/n8n-data-before-loadprompt-fix.tar
+
+ M .gitignore
+D  api_tests.ps1
+D  check_n8n.ps1
+D  debug2.ps1
+D  debug3.ps1
+D  debug_webhook.ps1
+D  infra_check2.ps1
+D  phase1_check.ps1
+D  run.ps1
+D  send_webhook.ps1
+D  test_api.ps1
+D  test_import.ps1
+D  test_invokerequest.ps1
+D  test_ir.ps1
+D  test_msgs.ps1
+D  test_urls.ps1
+D  test_urls2.ps1
+D  test_wc.ps1
+D  test_webhook.ps1
+R  infra_check.ps1 -> tests/n8n/runtime/infra_check.ps1
+R  run_s1.ps1 -> tests/n8n/runtime/run_s1.ps1
+R  test_422.ps1 -> tests/n8n/runtime/test_422.ps1
+D  try_api2.ps1
+D  try_import.ps1
+D  webhook_test.ps1
+D  webhook_test2.ps1
+D  wh5681.ps1
+?? docs/reports/LB1-baseline-backend.md
+?? docs/reports/LS1-scripts-racine.md
+?? docs/reports/evidence/LB1-env.txt
+?? docs/reports/evidence/LB1-mvn-test.txt
+?? docs/reports/evidence/LB1-test-inventory.txt
+?? docs/reports/evidence/LS1-inventory.txt
+?? docs/reports/evidence/LS1-security.txt
+?? docs/reports/evidence/LS1B-refs.txt
+
+=== git diff --cached --name-status ===
+D	api_tests.ps1
+D	check_n8n.ps1
+D	debug2.ps1
+D	debug3.ps1
+D	debug_webhook.ps1
+D	infra_check2.ps1
+D	phase1_check.ps1
+D	run.ps1
+D	send_webhook.ps1
+D	test_api.ps1
+D	test_import.ps1
+D	test_invokerequest.ps1
+D	test_ir.ps1
+D	test_msgs.ps1
+D	test_urls.ps1
+D	test_urls2.ps1
+D	test_wc.ps1
+D	test_webhook.ps1
+R063	infra_check.ps1	tests/n8n/runtime/infra_check.ps1
+R065	run_s1.ps1	tests/n8n/runtime/run_s1.ps1
+R070	test_422.ps1	tests/n8n/runtime/test_422.ps1
+D	try_api2.ps1
+D	try_import.ps1
+D	webhook_test.ps1
+D	webhook_test2.ps1
+D	wh5681.ps1

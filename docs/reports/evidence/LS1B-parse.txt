@@ -1,0 +1,10 @@
+PSScriptAnalyzer: ABSENT (non installé, rien n'a été installé)
+Méthode: [System.Management.Automation.Language.Parser]::ParseFile sans exécution
+
+PARSE tests/n8n/runtime/infra_check.ps1 errors=0
+PARSE tests/n8n/runtime/run_s1.ps1 errors=0
+PARSE tests/n8n/runtime/test_422.ps1 errors=0
+
+git grep -n -F 5681 -- tests/n8n/runtime : aucune occurrence (exit 1)
+Sondes laissées en dur : http://127.0.0.1:8080/actuator/health et http://127.0.0.1:11434/api/tags dans infra_check.ps1
+TrimEnd('/') appliqué dans les 3 scripts. Garde d'hôte : non écrite.

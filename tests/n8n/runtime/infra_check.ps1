@@ -1,22 +1,26 @@
+# Usage : vérifie que n8n, son webhook, le backend sur 127.0.0.1:8080 et Ollama sur 127.0.0.1:11434 répondent. Base n8n : $env:N8N_BASE_URL (défaut http://127.0.0.1:5678).
+# G6 : exécution soumise à accord explicite.
+$n8nBase = if ($env:N8N_BASE_URL) { $env:N8N_BASE_URL } else { 'http://127.0.0.1:5678' }
+$n8nBase = $n8nBase.TrimEnd('/')
 $wc = New-Object System.Net.WebClient
 $wc.Headers.Add('Content-Type','application/json')
 
 Write-Output "=== INFRASTRUCTURE REACHABILITY ==="
 Write-Output ""
 
-# Port 5678 (n8n)
-Write-Output "-- Port 5678 (n8n) --"
+# n8n (base $env:N8N_BASE_URL)
+Write-Output "-- n8n ($n8nBase) --"
 try {
-    $r = $wc.UploadString('http://127.0.0.1:5678/', '')
+    $r = $wc.UploadString("$n8nBase/", '')
     Write-Output "Length: $($r.Length) Body: $($r)"
 } catch {
     Write-Output "Error: $($_.Exception.Message.Substring(0,30))"
 }
 
-# Port 5681 (webhook)
-Write-Output "-- Port 5681 (document-generation webhook) --"
+# webhook document-generation sur la même base
+Write-Output "-- webhook document-generation ($n8nBase) --"
 try {
-    $r = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', '')
+    $r = $wc.UploadString("$n8nBase/webhook/document-generation", '')
     Write-Output "Length: $($r.Length) Body: $($r.Substring(0,200))"
 } catch {
     Write-Output "Error: $($_.Exception.Message.Substring(0,30))"

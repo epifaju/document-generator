@@ -1,0 +1,330 @@
+LS1 phase 2 etape 1 — git grep references (23 scripts racine)
+Date: 2026-10-25
+Commande: git grep -n -F -- "<nomfichier>" depuis racine
+
+================================================================================
+api_tests.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:47:| `api_tests.ps1` | API n8n (`/api/v1/workflows`, executions) | lecture API refusée |
+docs/reports/evidence/LB1C-grep-5681.txt:28:api_tests.ps1:9:$endpoints.Add("http://127.0.0.1:5681/api/v1/workflows")
+docs/reports/evidence/LB1C-grep-5681.txt:29:api_tests.ps1:10:$endpoints.Add("http://127.0.0.1:5681/api/v1/workflows/1oVzZvEXnWWY3R9F")
+docs/reports/evidence/LB1C-grep-5681.txt:30:api_tests.ps1:11:$endpoints.Add("http://127.0.0.1:5681/api/v1/executions")
+docs/reports/evidence/LB1C-grep-5681.txt:31:api_tests.ps1:12:$endpoints.Add("http://127.0.0.1:5681/rest/workflows")
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est api_tests.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+api_tests.ps1 | 0 | 5 | OK
+
+================================================================================
+check_n8n.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:48:| `check_n8n.ps1` | webhook `POST /webhook/document-generation` | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:32:check_n8n.ps1:4:# Check port 5681 connectivity
+docs/reports/evidence/LB1C-grep-5681.txt:33:check_n8n.ps1:5:Write-Output "-- Port 5681 connectivity --"
+docs/reports/evidence/LB1C-grep-5681.txt:34:check_n8n.ps1:10:    $r = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', $p)
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est check_n8n.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+check_n8n.ps1 | 0 | 4 | OK
+
+================================================================================
+debug2.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:49:| `debug2.ps1` | racine, `/webhook`, webhook document | sondes HTTP refusées |
+docs/reports/evidence/LB1C-grep-5681.txt:35:debug2.ps1:8:# Test 1: POST to 5681 webhook - get full error info
+docs/reports/evidence/LB1C-grep-5681.txt:36:debug2.ps1:9:Write-Output "-- Test 1: POST /webhook/document-generation on port 5681 --"
+docs/reports/evidence/LB1C-grep-5681.txt:37:debug2.ps1:11:    $result = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', $p)
+docs/reports/evidence/LB1C-grep-5681.txt:38:debug2.ps1:29:Write-Output "-- Test 2: GET /webhook on port 5681 --"
+docs/reports/evidence/LB1C-grep-5681.txt:39:debug2.ps1:31:    $result2 = $wc.UploadString('http://127.0.0.1:5681/webhook', $p)
+docs/reports/evidence/LB1C-grep-5681.txt:40:debug2.ps1:38:Write-Output "-- Test 3: POST root on port 5681 --"
+docs/reports/evidence/LB1C-grep-5681.txt:41:debug2.ps1:40:    $result3 = $wc.UploadString('http://127.0.0.1:5681/', $p)
+docs/reports/evidence/LB1C-grep-5681.txt:42:debug2.ps1:47:Write-Output "-- Test 4: Invoke-WebRequest POST on port 5681 --"
+docs/reports/evidence/LB1C-grep-5681.txt:43:debug2.ps1:49:    $wr = Invoke-WebRequest -Uri 'http://127.0.0.1:5681/webhook/document-generation' -Method Post -Body $p -ContentType 'application/json' -ErrorAction Stop
+docs/reports/evidence/LB1C-grep-5681.txt:44:debug2.ps1:63:Write-Output "-- Test 5: Invoke-WebRequest GET on port 5681 --"
+docs/reports/evidence/LB1C-grep-5681.txt:45:debug2.ps1:65:    $wr2 = Invoke-WebRequest -Uri 'http://127.0.0.1:5681/' -Method Get -ErrorAction Stop
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est debug2.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+debug2.ps1 | 0 | 12 | OK
+
+================================================================================
+debug3.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:50:| `debug3.ps1` | chemins `/.ext/n8n`, `/n8n`, `/v1`, `/api` | sondes HTTP refusées |
+docs/reports/evidence/LB1C-grep-5681.txt:46:debug3.ps1:27:    "http://127.0.0.1:5681/.ext/n8n/nodes/describe?node=Webhook",
+docs/reports/evidence/LB1C-grep-5681.txt:47:debug3.ps1:28:    "http://127.0.0.1:5681/n8n/nodes",
+docs/reports/evidence/LB1C-grep-5681.txt:48:debug3.ps1:29:    "http://127.0.0.1:5681/v1/workflows",
+docs/reports/evidence/LB1C-grep-5681.txt:49:debug3.ps1:30:    "http://127.0.0.1:5681/api/workflows"
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est debug3.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+debug3.ps1 | 0 | 5 | OK
+
+================================================================================
+phase1_check.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:54:| `phase1_check.ps1` | API et métadonnées n8n | lecture API refusée |
+docs/reports/evidence/LB1C-grep-5681.txt:58:phase1_check.ps1:6:    "http://127.0.0.1:5681/.ext/n8n/nodes/describe?node=Webhook",
+docs/reports/evidence/LB1C-grep-5681.txt:59:phase1_check.ps1:7:    "http://127.0.0.1:5681/n8n/nodes",
+docs/reports/evidence/LB1C-grep-5681.txt:60:phase1_check.ps1:8:    "http://127.0.0.1:5681/.ext/n8n/workflows/document-generation-v1",
+docs/reports/evidence/LB1C-grep-5681.txt:61:phase1_check.ps1:9:    "http://127.0.0.1:5681/.ext/n8n/workflows",
+docs/reports/evidence/LB1C-grep-5681.txt:62:phase1_check.ps1:10:    "http://127.0.0.1:5681/.ext/n8n/executions",
+docs/reports/evidence/LB1C-grep-5681.txt:63:phase1_check.ps1:11:    "http://127.0.0.1:5681/.ext/n8n/settings",
+docs/reports/evidence/LB1C-grep-5681.txt:64:phase1_check.ps1:12:    "http://127.0.0.1:5681/.ext/n8n/nodes/node-types",
+docs/reports/evidence/LB1C-grep-5681.txt:65:phase1_check.ps1:13:    "http://127.0.0.1:5681/.ext/n8n/nodes/describe?node=InitOrchestration"
+docs/reports/evidence/LB1C-grep-5681.txt:66:phase1_check.ps1:34:    $r = (New-Object System.Net.WebClient).DownloadString('http://127.0.0.1:5681/')
+docs/reports/evidence/LB1C-grep-5681.txt:67:phase1_check.ps1:42:    $r = (New-Object System.Net.WebClient).DownloadString('http://127.0.0.1:5681/api/v1/info')
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est phase1_check.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+phase1_check.ps1 | 0 | 11 | OK
+
+================================================================================
+send_webhook.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:57:| `send_webhook.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:75:send_webhook.ps1:8:$url = "http://127.0.0.1:5681/webhook/document-generation"
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est send_webhook.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+send_webhook.ps1 | 0 | 2 | OK
+
+================================================================================
+test_api.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:59:| `test_api.ps1` | `/.ext/n8n`, `/n8n/nodes`, `/health` | sondes HTTP refusées |
+docs/reports/evidence/LB1C-grep-5681.txt:77:test_api.ps1:7:    "http://127.0.0.1:5681/.ext/n8n/nodes/describe?node=Webhook",
+docs/reports/evidence/LB1C-grep-5681.txt:78:test_api.ps1:8:    "http://127.0.0.1:5681/n8n/nodes",
+docs/reports/evidence/LB1C-grep-5681.txt:79:test_api.ps1:9:    "http://127.0.0.1:5681/health"
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_api.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_api.ps1 | 0 | 4 | OK
+
+================================================================================
+test_import.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:60:| `test_import.ps1` | base `http://127.0.0.1:5681` | import injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:80:test_import.ps1:4:    $url = "http://127.0.0.1:5681" + $p
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_import.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_import.ps1 | 0 | 2 | OK
+
+================================================================================
+test_ir.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:62:| `test_ir.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:82:test_ir.ps1:2:$url = "http://127.0.0.1:5681/webhook/document-generation"
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_ir.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_ir.ps1 | 0 | 2 | OK
+
+================================================================================
+test_msgs.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:63:| `test_msgs.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:83:test_msgs.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_msgs.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_msgs.ps1 | 0 | 2 | OK
+
+================================================================================
+test_urls.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:64:| `test_urls.ps1` | `/`, `/webhook`, `/api` | sondes HTTP refusées |
+docs/reports/evidence/LB1C-grep-5681.txt:84:test_urls.ps1:3:    "http://127.0.0.1:5681/",
+docs/reports/evidence/LB1C-grep-5681.txt:85:test_urls.ps1:4:    "http://127.0.0.1:5681/webhook",
+docs/reports/evidence/LB1C-grep-5681.txt:86:test_urls.ps1:5:    "http://127.0.0.1:5681/api",
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_urls.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_urls.ps1 | 0 | 4 | OK
+
+================================================================================
+test_urls2.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:65:| `test_urls2.ps1` | GET et POST sur la racine | sondes HTTP refusées |
+docs/reports/evidence/LB1C-grep-5681.txt:87:test_urls2.ps1:3:    "5681_get" = "http://127.0.0.1:5681/";
+docs/reports/evidence/LB1C-grep-5681.txt:88:test_urls2.ps1:4:    "5681_post_empty" = "http://127.0.0.1:5681/";
+docs/reports/evidence/LB1C-grep-5681.txt:89:test_urls2.ps1:10:    $wr = Invoke-WebRequest -Uri $urls."5681_get" -Method Get -ErrorAction Stop
+docs/reports/evidence/LB1C-grep-5681.txt:90:test_urls2.ps1:11:    Write-Output "5681 GET: Status=$($wr.StatusCode) Length=$($wr.Content.Length)"
+docs/reports/evidence/LB1C-grep-5681.txt:91:test_urls2.ps1:13:    Write-Output "5681 GET: ERROR"
+docs/reports/evidence/LB1C-grep-5681.txt:92:test_urls2.ps1:19:    $result = $wc.UploadString("http://127.0.0.1:5681/", "")
+docs/reports/evidence/LB1C-grep-5681.txt:93:test_urls2.ps1:20:    Write-Output "5681 POST empty: Length=$($result.Length)"
+docs/reports/evidence/LB1C-grep-5681.txt:94:test_urls2.ps1:22:    Write-Output "5681 POST empty: ERROR"
+docs/reports/evidence/LB1C-grep-5681.txt:95:test_urls2.ps1:28:    $result = $wc.UploadString("http://127.0.0.1:5681/", $payload)
+docs/reports/evidence/LB1C-grep-5681.txt:96:test_urls2.ps1:29:    Write-Output "5681 POST JSON: Length=$($result.Length)"
+docs/reports/evidence/LB1C-grep-5681.txt:97:test_urls2.ps1:31:    Write-Output "5681 POST JSON: ERROR"
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_urls2.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_urls2.ps1 | 0 | 12 | OK
+
+================================================================================
+test_webhook.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:67:| `test_webhook.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:99:test_webhook.ps1:8:$url = "http://127.0.0.1:5681/webhook/document-generation"
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_webhook.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_webhook.ps1 | 0 | 2 | OK
+
+================================================================================
+try_api2.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:68:| `try_api2.ps1` | `/api/workflows`, `/workflows`, `/v1/workflows` | lecture API refusée |
+docs/reports/evidence/LB1C-grep-5681.txt:100:try_api2.ps1:4:    $r = $wc.DownloadString('http://127.0.0.1:5681/api/workflows')
+docs/reports/evidence/LB1C-grep-5681.txt:101:try_api2.ps1:13:    $r = $wc.DownloadString('http://127.0.0.1:5681/workflows')
+docs/reports/evidence/LB1C-grep-5681.txt:102:try_api2.ps1:22:    $r = $wc.DownloadString('http://127.0.0.1:5681/v1/workflows')
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est try_api2.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+try_api2.ps1 | 0 | 4 | OK
+
+================================================================================
+try_import.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:69:| `try_import.ps1` | `/api/v1/workflows`, `/rest/workflows` | import injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:103:try_import.ps1:5:    'http://127.0.0.1:5681/api/v1/workflows',
+docs/reports/evidence/LB1C-grep-5681.txt:104:try_import.ps1:6:    'http://127.0.0.1:5681/rest/workflows'
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est try_import.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+try_import.ps1 | 0 | 3 | OK
+
+================================================================================
+webhook_test.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:70:| `webhook_test.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:105:webhook_test.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est webhook_test.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+webhook_test.ps1 | 0 | 2 | OK
+
+================================================================================
+debug_webhook.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:51:| `debug_webhook.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:50:debug_webhook.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est debug_webhook.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+debug_webhook.ps1 | 0 | 2 | OK
+
+================================================================================
+infra_check2.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:53:| `infra_check2.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:54:infra_check2.ps1:21:# Port 5681 (webhook)
+docs/reports/evidence/LB1C-grep-5681.txt:55:infra_check2.ps1:22:Write-Output "-- Port 5681 (document-generation webhook) --"
+docs/reports/evidence/LB1C-grep-5681.txt:56:infra_check2.ps1:24:    $r = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', '')
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est infra_check2.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+infra_check2.ps1 | 0 | 4 | OK
+
+================================================================================
+run.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:55:| `run.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:73:run.ps1:4:$r = $wc.UploadString('http://127.0.0.1:5681/webhook/document-generation', $p)
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est run.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+run.ps1 | 0 | 2 | OK
+
+================================================================================
+test_invokerequest.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:61:| `test_invokerequest.ps1` | webhook sur `5678` et sur `5681` | l'URL `5678` peut répondre ; l'URL `5681` est refusée |
+docs/reports/LB1c-gardiens.md:176:- `test_invokerequest.ps1` tente les deux ports. L'URL `5678` peut réussir ; l'URL `5681` échoue.
+docs/reports/evidence/LB1C-grep-5681.txt:81:test_invokerequest.ps1:2:$urls = @("http://127.0.0.1:5678/webhook/document-generation", "http://127.0.0.1:5681/webhook/document-generation")
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_invokerequest.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_invokerequest.ps1 | 0 | 3 | OK
+
+================================================================================
+test_wc.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:66:| `test_wc.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:98:test_wc.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est test_wc.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+test_wc.ps1 | 0 | 2 | OK
+
+================================================================================
+webhook_test2.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:71:| `webhook_test2.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:106:webhook_test2.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est webhook_test2.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+webhook_test2.ps1 | 0 | 2 | OK
+
+================================================================================
+wh5681.ps1
+================================================================================
+Sortie git grep brute:
+docs/reports/LB1c-gardiens.md:72:| `wh5681.ps1` | webhook document | webhook injoignable |
+docs/reports/evidence/LB1C-grep-5681.txt:107:wh5681.ps1:4:$url = 'http://127.0.0.1:5681/webhook/document-generation'
+
+Auto-citation fichier script: git grep ne remonte aucune ligne dont le chemin est wh5681.ps1 (contenu interne sans le nom de fichier).
+Classification: hits dans LB1c-gardiens.md et LB1C-grep-5681.txt -> NON_BLOQUANT.
+wh5681.ps1 | 0 | 2 | OK
+
+================================================================================
+SYNTHESE
+REFS: STOP=0 OK=23
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

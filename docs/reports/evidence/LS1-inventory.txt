@@ -1,0 +1,301 @@
+=== git grep -l -F "5681" (sortie brute) ===
+FIX4.2_REPORT.md
+FIX4.3_REPORT.md
+FIX4.4_REPORT.md
+INDEPENDENT_RUNTIME_AUDIT.md
+R3_FINAL_REPORT.md
+R5_PRERESTART_VERIFICATION.md
+REVIEWER_REPORT.md
+S1_REPORT.md
+SESSION_FINAL_REPORT.md
+api_tests.ps1
+check_n8n.ps1
+debug2.ps1
+debug3.ps1
+debug_webhook.ps1
+docs/reports/LB1c-gardiens.md
+docs/reports/evidence/LB1C-diff.txt
+docs/reports/evidence/LB1C-grep-5681.txt
+infra_check.ps1
+infra_check2.ps1
+n8n/backups/n8n-data-before-loadprompt-fix.tar
+phase1_check.ps1
+reviewer_verification.md
+run.ps1
+run_s1.ps1
+send_webhook.ps1
+test_422.ps1
+test_api.ps1
+test_import.ps1
+test_invokerequest.ps1
+test_ir.ps1
+test_msgs.ps1
+test_urls.ps1
+test_urls2.ps1
+test_wc.ps1
+test_webhook.ps1
+try_api2.ps1
+try_import.ps1
+webhook_test.ps1
+webhook_test2.ps1
+wh5681.ps1
+
+Note: 26 scripts *.ps1 (aligné baseline LB1c 26).
+
+=== SCRIPTS (lecture seule, non exécutés) ===
+
+--- api_tests.ps1 ---
+chemin: api_tests.ps1
+taille_octets: 883
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Sonde en GET plusieurs endpoints REST n8n supposés sur le port webhook local et affiche succès ou erreur.
+ports_URL: http://127.0.0.1:5681 — /api/v1/workflows, /api/v1/workflows/{id}, /api/v1/executions, /rest/workflows. 5678: non.
+dependances_deduites: n8n (API HTTP). Pas Docker, Ollama, PostgreSQL explicites. aucune de ces quatre si on ne retient que l’appel HTTP vers 5681.
+references: docs/reports/LB1c-gardiens.md (table inventaire). docs/reports/evidence/LB1C-grep-5681.txt (extrait grep antérieur, pas invocation). Aucune citation dans requirements/, tests/, n8n/workflows/, autre script.
+
+--- check_n8n.ps1 ---
+chemin: check_n8n.ps1
+taille_octets: 1190
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Vérifie la connectivité du webhook document-generation par POST JSON minimal sur 5681 puis compare avec le même chemin sur 5678.
+ports_URL: 5681 POST /webhook/document-generation; 5678 POST /webhook/document-generation (5678: oui).
+dependances_deduites: n8n (webhook). aucune de ces quatre pour la partie 5681 seule; comparaison explicite port n8n 5678.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt (grep). Pas test/requirements/workflow/autre script.
+
+--- debug2.ps1 ---
+chemin: debug2.ps1
+taille_octets: 2585
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Débogage HTTP détaillé (WebClient et Invoke-WebRequest) sur racine, /webhook et webhook document-generation avec capture d’erreurs.
+ports_URL: 5681 — /webhook/document-generation, /webhook, / (GET et POST). 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt. Pas ailleurs.
+
+--- debug3.ps1 ---
+chemin: debug3.ps1
+taille_octets: 1401
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Inspecte les répertoires de données n8n locaux sous le profil utilisateur puis sonde des chemins API internes sur 5681.
+ports_URL: 5681 — /.ext/n8n/nodes/describe, /n8n/nodes, /v1/workflows, /api/workflows. 5678: non.
+dependances_deduites: n8n (fichiers locaux ~/.n8n ou APPDATA + HTTP). Pas Docker/PostgreSQL/Ollama dans le texte.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- debug_webhook.ps1 ---
+chemin: debug_webhook.ps1
+taille_octets: 758
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Envoie un message métier synthétique d’attestation au webhook document-generation et affiche corps et longueur de réponse.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- infra_check.ps1 ---
+chemin: infra_check.ps1
+taille_octets: 1356
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Teste la joignabilité de plusieurs services locaux (n8n, webhook, backend Spring, Ollama) via requêtes HTTP simples.
+ports_URL: 5678 / (n8n); 5681 POST /webhook/document-generation; aussi 8080 /actuator/health et 11434 /api/tags (hors périmètre 5681).
+dependances_deduites: n8n, Ollama, autre (backend 8080). Pas Docker/PostgreSQL explicites.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- infra_check2.ps1 ---
+chemin: infra_check2.ps1
+taille_octets: 2192
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Variante d’infra_check avec gestion d’erreurs WebException plus verbeuse pour les mêmes sondes multi-ports.
+ports_URL: 5678 /; 5681 POST /webhook/document-generation; 8080 /actuator/health; 11434 /api/tags.
+dependances_deduites: n8n, Ollama, autre (backend). Pas Docker/PostgreSQL.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- phase1_check.ps1 ---
+chemin: phase1_check.ps1
+taille_octets: 1758
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Phase 1 — interroge des endpoints internes n8n (workflows, executions, settings, nodes) et info API sur 5681.
+ports_URL: 5681 — /.ext/n8n/* (workflows document-generation-v1, executions, settings, nodes), /n8n/nodes, /, /api/v1/info. 5678: non.
+dependances_deduites: n8n. aucune de ces quatre pour HTTP 5681 seul.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- run.ps1 ---
+chemin: run.ps1
+taille_octets: 408
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Script minimal qui POSTe un message d’attestation concordance au webhook et affiche la réponse brute.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt. Nom générique run.ps1 — aucun autre hit hors doc LB1c.
+
+--- run_s1.ps1 ---
+chemin: run_s1.ps1
+taille_octets: 790
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Envoie le scénario S1 au webhook puis tente de parser outcome, correlationId et requestId en JSON.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- send_webhook.ps1 ---
+chemin: send_webhook.ps1
+taille_octets: 913
+dernier_commit: 7348adb 2026-10-07 suite dev
+role: Envoie une requête webhook synthétique avec message tronqué et affiche la réponse ou erreur avec parsing JSON partiel.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_422.ps1 ---
+chemin: test_422.ps1
+taille_octets: 978
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Teste le webhook avec payload complet et remonte statut HTTP et corps d’erreur en cas d’échec (contexte 422).
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_api.ps1 ---
+chemin: test_api.ps1
+taille_octets: 586
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Sonde trois chemins API/health n8n sur 5681 et affiche un extrait de réponse ou l’erreur.
+ports_URL: 5681 — /.ext/n8n/nodes/describe?node=Webhook, /n8n/nodes, /health. 5678: non.
+dependances_deduites: n8n. aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_import.ps1 ---
+chemin: test_import.ps1
+taille_octets: 447
+dernier_commit: 7348adb 2026-10-07 suite dev
+role: Découvre quels chemins racine sous 5681 répondent en GET (/workflows, /api/v1, /internal, etc.).
+ports_URL: 5681 GET sur /, /workflow, /workflows, /node, /nodes, /execute, /run, /api/v1, /v1/, /internal, /internal/. 5678: non.
+dependances_deduites: n8n (exploration HTTP). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_invokerequest.ps1 ---
+chemin: test_invokerequest.ps1
+taille_octets: 641
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Compare Invoke-WebRequest POST sur le webhook document-generation entre ports 5678 et 5681.
+ports_URL: 5678 et 5681 POST /webhook/document-generation (5678: oui).
+dependances_deduites: n8n (webhook). aucune de ces quatre si 5681 seul.
+references: docs/reports/LB1c-gardiens.md (2 mentions); LB1C-grep-5681.txt.
+
+--- test_ir.ps1 ---
+chemin: test_ir.ps1
+taille_octets: 1108
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Appelle le webhook via Invoke-WebRequest avec message français complet et détaille statut et corps de réponse ou d’erreur.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_msgs.ps1 ---
+chemin: test_msgs.ps1
+taille_octets: 1572
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Enchaîne trois POST webhook (message ASCII, message français, JSON minimal) via Invoke-WebRequest pour comparer les réponses.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_urls.ps1 ---
+chemin: test_urls.ps1
+taille_octets: 593
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Sonde plusieurs URL racine/webhook/api sur 5681 et 5678 avec WebClient et affiche longueur ou erreur.
+ports_URL: 5681 — /, /webhook, /api; 5678 — /, /webhook, /api (5678: oui).
+dependances_deduites: n8n. aucune de ces quatre pour 5681 seul.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_urls2.ps1 ---
+chemin: test_urls2.ps1
+taille_octets: 985
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Teste GET racine 5681, POST vide et POST JSON sur 5681, plus GET sur 5678 pour comparer comportements.
+ports_URL: 5681 / (GET et POST); 5678 / GET (5678: oui).
+dependances_deduites: n8n. aucune de ces quatre pour 5681 seul.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_wc.ps1 ---
+chemin: test_wc.ps1
+taille_octets: 1504
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Trois envois webhook via WebClient (messages variés) avec affichage corps et code HTTP en erreur.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- test_webhook.ps1 ---
+chemin: test_webhook.ps1
+taille_octets: 833
+dernier_commit: 7348adb 2026-10-07 suite dev
+role: Envoie un body webhook synthétique et tente d’interpréter outcome et correlationId en JSON.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- try_api2.ps1 ---
+chemin: try_api2.ps1
+taille_octets: 949
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Tente en GET l’export workflows via trois chemins API alternatifs sur 5681.
+ports_URL: 5681 — /api/workflows, /workflows, /v1/workflows. 5678: non.
+dependances_deduites: n8n (API). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- try_import.ps1 ---
+chemin: try_import.ps1
+taille_octets: 703
+dernier_commit: 7348adb 2026-10-07 suite dev
+role: Lit le JSON workflow versionné local puis tente download et upload vers endpoints workflows sur 5681.
+ports_URL: 5681 — /api/v1/workflows, /rest/workflows (GET et POST). 5678: non.
+dependances_deduites: n8n (import workflow + fichier n8n/workflows/document-generation-v1.json). Pas Docker/PostgreSQL/Ollama.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- webhook_test.ps1 ---
+chemin: webhook_test.ps1
+taille_octets: 383
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: POST minimal au webhook document-generation et imprime uniquement le corps de réponse.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- webhook_test2.ps1 ---
+chemin: webhook_test2.ps1
+taille_octets: 611
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Même appel webhook que webhook_test puis écrit la réponse dans un fichier sous C:\temp et affiche longueur et extrait.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+--- wh5681.ps1 ---
+chemin: wh5681.ps1
+taille_octets: 777
+dernier_commit: 6d7f02a 2026-10-10 correction workflow suite aux tests
+role: Appel webhook document-generation avec message métier complet et parsing JSON de outcome, correlationId, requestId.
+ports_URL: 5681 POST /webhook/document-generation. 5678: non.
+dependances_deduites: n8n (webhook). aucune de ces quatre.
+references: docs/reports/LB1c-gardiens.md; LB1C-grep-5681.txt.
+
+=== FIN ===
+Nombre de scripts inventoriés: 26
+git log -1 obtenu pour chacun des 26 scripts (22 × 6d7f02a, 4 × 7348adb).
+
+Chemins git grep non scripts (14, non analysés en profondeur):
+- FIX4.2_REPORT.md
+- FIX4.3_REPORT.md
+- FIX4.4_REPORT.md
+- INDEPENDENT_RUNTIME_AUDIT.md
+- R3_FINAL_REPORT.md
+- R5_PRERESTART_VERIFICATION.md
+- REVIEWER_REPORT.md
+- S1_REPORT.md
+- SESSION_FINAL_REPORT.md
+- docs/reports/LB1c-gardiens.md
+- docs/reports/evidence/LB1C-diff.txt
+- docs/reports/evidence/LB1C-grep-5681.txt
+- n8n/backups/n8n-data-before-loadprompt-fix.tar
+- reviewer_verification.md
+
+Secrets: aucune valeur secrète recopiée dans cet inventaire.

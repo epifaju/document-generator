@@ -1,0 +1,54 @@
+LS1 — revue sécurité lecture seule (aucune valeur citée)
+Scripts lus par la revue : les 26 de LS1-inventory.txt. Aucun script exécuté.
+Commandes archive exécutées par l'orchestrateur (le sous-agent sécurité n'avait pas le shell) :
+  git ls-files -- n8n/backups
+  git log --oneline -- n8n/backups
+  tar -tf n8n/backups/n8n-data-before-loadprompt-fix.tar
+Pas de tar -x. Contenu des fichiers de l'archive non lu.
+
+SECRETS: 0
+
+Chaque script : aucun secret en dur (jeton, clé d'API, mot de passe, URL de connexion, clé de chiffrement, Bearer).
+Recherche de motifs sur les *.ps1 de la racine : aucune ligne Bearer, apiKey, jdbc, N8N_ENCRYPTION, POSTGRES_PASSWORD, password, Authorization, sk_live.
+Fixtures nominatives (corps de webhook synthétiques, valeurs non recopiées) : debug_webhook.ps1, run.ps1, run_s1.ps1, send_webhook.ps1, test_422.ps1, test_ir.ps1, test_msgs.ps1, test_wc.ps1, test_webhook.ps1, webhook_test.ps1, webhook_test2.ps1, wh5681.ps1.
+Hors compteur secret : webhook_test2.ps1 écrit la réponse sous C:\temp\wh_result.txt. debug3.ps1 parcourt des répertoires n8n locaux. Plusieurs scripts affichent le corps HTTP complet.
+
+=== git ls-files -- n8n/backups ===
+n8n/backups/container-metadata.json
+n8n/backups/document-generation-before-deploy.json
+n8n/backups/document-generation-before-fix.json
+n8n/backups/document-generation-deploy-prepared.json
+n8n/backups/document-generation-deploy-ready.json
+n8n/backups/document-generation-preimport-20261009-184550.json
+n8n/backups/n8n-data-before-loadprompt-fix.tar
+
+L'archive est suivie par Git. Les six JSON du même dossier le sont aussi. Leur contenu n'a pas été ouvert dans ce lot.
+
+=== git log --oneline -- n8n/backups ===
+6d7f02a correction workflow suite aux tests
+
+=== tar -tf n8n/backups/n8n-data-before-loadprompt-fix.tar ===
+./
+./binaryData/
+./n8nEventLog.log
+./git/
+./n8nEventLog-3.log
+./nodes/
+./nodes/package.json
+./database.sqlite
+./config
+./n8nEventLog-1.log
+./n8nEventLog-2.log
+./workflows/
+./workflows/document-generation-v1.json
+./workflows/exported-workflow.json
+./workflows/exported-current.json
+./workflows/exported-workflow-after-fix.json
+./ssh/
+
+D'après les NOMS seulement :
+- base de données : database.sqlite
+- configuration : config
+- répertoire ssh/ (aucun nom de fichier enfant dans cette liste)
+- journaux : n8nEventLog.log, n8nEventLog-1.log, n8nEventLog-2.log, n8nEventLog-3.log
+- pas de fichier nommé .env, credentials ou encryptionKey dans la liste
