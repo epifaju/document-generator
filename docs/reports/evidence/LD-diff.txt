@@ -1,0 +1,255 @@
+diff --git a/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java b/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
+index 38abf45..c360e34 100644
+--- a/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
++++ b/backend/src/test/java/com/adgendoc/api/DocumentRequestControllerTest.java
+@@ -44,6 +44,7 @@ import java.util.logging.Logger;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.hamcrest.Matchers.containsString;
++import static org.hamcrest.Matchers.hasItem;
+ import static org.mockito.Mockito.spy;
+ import static org.mockito.Mockito.verifyNoInteractions;
+ import static org.hamcrest.Matchers.matchesPattern;
+@@ -846,6 +847,191 @@ class DocumentRequestControllerTest {
+                 .andExpect(jsonPath("$.correlationId").value("trace-abc-123"));
+     }
+ 
++    // ------------------------------------------------------------------
++    // Lot D — cellules absentes de la matrice statut × endpoint
++    // (API_CONTRACTS §3.3, §3.4, §3.5). Chaque méthode part d'un dépôt vide
++    // (nouvelle instance JUnit). Aucun code de production n'est sollicité
++    // au-delà des ports déjà utilisés par cette classe.
++    // ------------------------------------------------------------------
++
++    @Test
++    void e3_patch_on_generated_returns_409_request_already_closed() throws Exception {
++        // API_CONTRACTS §3.3 : GENERATED est terminal → 409 REQUEST_ALREADY_CLOSED.
++        UUID requestId = createRequest(validBody());
++        generateDocument(requestId);
++        StoredRequest before = capture(requestId);
++
++        mockMvc.perform(patch("/api/v1/requests/" + requestId)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"motif\":\"Tentative apres generation\"}"))
++                .andExpect(status().isConflict())
++                .andExpect(jsonPath("$.code").value("REQUEST_ALREADY_CLOSED"))
++                .andExpect(jsonPath("$.status").value("GENERATED"))
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        assertUnchanged(requestId, before);
++    }
++
++    @Test
++    void e3_patch_on_failed_request_returns_200_validated() throws Exception {
++        // API_CONTRACTS §3.3 : FAILED repris (T12) → 200, statut recalculé VALIDATED.
++        UUID requestId = createFailedRequest();
++
++        mockMvc.perform(patch("/api/v1/requests/" + requestId)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"motif\":\"Reprise apres echec\"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("VALIDATED"))
++                .andExpect(jsonPath("$.missingFields").isEmpty())
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        DocumentRequest stored = requestRepository.store.get(requestId);
++        assertThat(stored.getStatus()).isEqualTo(RequestStatus.VALIDATED);
++        assertThat(stored.getData()).containsEntry("motif", "Reprise apres echec");
++    }
++
++    @Test
++    void e3_patch_on_validated_request_keeps_validated() throws Exception {
++        // API_CONTRACTS §3.3 : VALIDATED conservé (T11).
++        UUID requestId = createRequest(validBody());
++
++        mockMvc.perform(patch("/api/v1/requests/" + requestId)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"motif\":\"Dossier mis a jour\"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("VALIDATED"))
++                .andExpect(jsonPath("$.missingFields").isEmpty())
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        DocumentRequest stored = requestRepository.store.get(requestId);
++        assertThat(stored.getStatus()).isEqualTo(RequestStatus.VALIDATED);
++        assertThat(stored.getData()).containsEntry("motif", "Dossier mis a jour");
++    }
++
++    @Test
++    void e3_patch_clearing_required_field_returns_200_missing_information() throws Exception {
++        // API_CONTRACTS §3.3 : VALIDATED rétrogradé en MISSING_INFORMATION (T7).
++        UUID requestId = createRequest(validBody());
++
++        mockMvc.perform(patch("/api/v1/requests/" + requestId)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"prenom\":\"   \"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("MISSING_INFORMATION"))
++                .andExpect(jsonPath("$.missingFields").value(hasItem("prenom")))
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        DocumentRequest stored = requestRepository.store.get(requestId);
++        assertThat(stored.getStatus()).isEqualTo(RequestStatus.MISSING_INFORMATION);
++        assertThat(stored.getMissingFields()).contains("prenom");
++        assertThat(stored.getData()).doesNotContainKey("prenom");
++    }
++
++    @Test
++    void e3_malformed_json_returns_400_payload_without_mutation() throws Exception {
++        // N8N_CONTRACTS §3.2 : 400 VALIDATION_ERROR non persistant d'E3,
++        // fieldErrors[0].field = payload. API_CONTRACTS §3.3 est muet sur ce
++        // cas (question ouverte docs/reports/L0c-CT2.md).
++        UUID requestId = createMissingRequest();
++        StoredRequest before = capture(requestId);
++
++        mockMvc.perform(patch("/api/v1/requests/" + requestId)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"lieuNaissance\":"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
++                .andExpect(jsonPath("$.fieldErrors[0].field").value("payload"))
++                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_PAYLOAD_INVALIDE"))
++                .andExpect(jsonPath("$.requestId").doesNotExist())
++                .andExpect(jsonPath("$.status").doesNotExist());
++
++        assertUnchanged(requestId, before);
++    }
++
++    @Test
++    void e4_validate_on_failed_request_returns_200_validated() throws Exception {
++        // API_CONTRACTS §3.4 : reprise après FAILED lorsque les règles passent (T12).
++        UUID requestId = createFailedRequest();
++
++        mockMvc.perform(post("/api/v1/requests/" + requestId + "/validate"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("VALIDATED"))
++                .andExpect(jsonPath("$.missingFields").isEmpty())
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        assertThat(requestRepository.store.get(requestId).getStatus())
++                .isEqualTo(RequestStatus.VALIDATED);
++    }
++
++    @Test
++    void e4_validate_on_failed_request_with_broken_rule_returns_400_rejected() throws Exception {
++        // API_CONTRACTS §3.4 : règle métier → 400, persisté REJECTED (T12b).
++        // E1 applique déjà la règle, donc cet état n'est pas produit par
++        // l'API : les données sont replantées sur l'agrégat déjà tenu par
++        // le dépôt en mémoire (setPayload existant, aucun code de production).
++        UUID requestId = createFailedRequest();
++        plantIdenticalConcordanceNames(requestId);
++
++        mockMvc.perform(post("/api/v1/requests/" + requestId + "/validate"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
++                .andExpect(jsonPath("$.status").value("REJECTED"))
++                .andExpect(jsonPath("$.fieldErrors[0].code").value("ERR_NOM_CONCORDANCE_IDENTIQUE"))
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        assertThat(requestRepository.store.get(requestId).getStatus())
++                .isEqualTo(RequestStatus.REJECTED);
++    }
++
++    @Test
++    void e5_generate_on_rejected_request_returns_409_invalid_status() throws Exception {
++        // API_CONTRACTS §3.5 : statut ≠ VALIDATED → 409 INVALID_STATUS.
++        UUID requestId = createRejectedRequest();
++        StoredRequest before = capture(requestId);
++
++        mockMvc.perform(post("/api/v1/requests/" + requestId + "/generate"))
++                .andExpect(status().isConflict())
++                .andExpect(jsonPath("$.code").value("INVALID_STATUS"))
++                .andExpect(jsonPath("$.status").value("REJECTED"))
++                .andExpect(jsonPath("$.message").value(containsString("REJECTED")))
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        assertUnchanged(requestId, before);
++    }
++
++    @Test
++    void e5_generate_on_generated_request_returns_409_invalid_status() throws Exception {
++        // API_CONTRACTS §3.5 : un second appel après GENERATED reste 409.
++        UUID requestId = createRequest(validBody());
++        generateDocument(requestId);
++        StoredRequest before = capture(requestId);
++
++        mockMvc.perform(post("/api/v1/requests/" + requestId + "/generate"))
++                .andExpect(status().isConflict())
++                .andExpect(jsonPath("$.code").value("INVALID_STATUS"))
++                .andExpect(jsonPath("$.status").value("GENERATED"))
++                .andExpect(jsonPath("$.message").value(containsString("GENERATED")))
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        assertUnchanged(requestId, before);
++    }
++
++    @Test
++    void e5_generate_on_failed_request_returns_409_invalid_status() throws Exception {
++        // API_CONTRACTS §3.5 : FAILED ≠ VALIDATED → 409, statut inchangé.
++        UUID requestId = createFailedRequest();
++        StoredRequest before = capture(requestId);
++
++        mockMvc.perform(post("/api/v1/requests/" + requestId + "/generate"))
++                .andExpect(status().isConflict())
++                .andExpect(jsonPath("$.code").value("INVALID_STATUS"))
++                .andExpect(jsonPath("$.status").value("FAILED"))
++                .andExpect(jsonPath("$.message").value(containsString("FAILED")))
++                .andExpect(jsonPath("$.requestId").value(requestId.toString()));
++
++        assertUnchanged(requestId, before);
++    }
++
+     // ------------------------------------------------------------------
+     // Helpers
+     // ------------------------------------------------------------------
+@@ -959,6 +1145,50 @@ class DocumentRequestControllerTest {
+         return UUID.fromString(objectMapper.readTree(response).get("requestId").asText());
+     }
+ 
++    private UUID createFailedRequest() throws Exception {
++        templateRepository.template = Optional.empty();
++        UUID requestId = createRequest(validBody());
++        mockMvc.perform(post("/api/v1/requests/" + requestId + "/generate"))
++                .andExpect(status().isInternalServerError())
++                .andExpect(jsonPath("$.code").value("TEMPLATE_NOT_FOUND"));
++        restoreTemplate();
++        assertThat(requestRepository.store.get(requestId).getStatus())
++                .isEqualTo(RequestStatus.FAILED);
++        return requestId;
++    }
++
++    private void restoreTemplate() {
++        templateRepository.template = Optional.of(
++                new Template(DOCUMENT_TYPE, "1.0", "attestation_concordance_v1.docx",
++                        "checksum", true));
++    }
++
++    private void plantIdenticalConcordanceNames(UUID requestId) {
++        DocumentRequest stored = requestRepository.store.get(requestId);
++        Map<String, Object> data = new LinkedHashMap<>(stored.getData());
++        data.put("nomIncorrect", data.get("nomCorrect"));
++        Map<String, Object> payload = new LinkedHashMap<>(stored.getPayload());
++        payload.put("data", data);
++        stored.setPayload(payload);
++    }
++
++    private StoredRequest capture(UUID requestId) {
++        DocumentRequest stored = requestRepository.store.get(requestId);
++        return new StoredRequest(stored.getStatus(), stored.getData(),
++                List.copyOf(stored.getMissingFields()), stored.getUpdatedAt(),
++                stored.getVersion(), documentRepository.store.size(),
++                requestRepository.saveCount);
++    }
++
++    private void assertUnchanged(UUID requestId, StoredRequest before) {
++        assertThat(capture(requestId)).isEqualTo(before);
++    }
++
++    private record StoredRequest(RequestStatus status, Map<String, Object> data,
++                                 List<String> missingFields, Instant updatedAt,
++                                 int version, int documentCount, int saveCount) {
++    }
++
+     private UUID generateDocument(UUID requestId) throws Exception {
+         String response = mockMvc.perform(post("/api/v1/requests/" + requestId + "/generate"))
+                 .andExpect(status().isCreated())
