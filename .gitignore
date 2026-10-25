@@ -8,3 +8,5 @@ docker/.env
 *.log
 .idea/
 .vscode/
+n8n/backups/*.tar
+n8n/backups/**/database.sqlite
